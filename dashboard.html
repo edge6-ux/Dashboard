@@ -3608,10 +3608,23 @@
         return;
       }
 
-      container.innerHTML = `<div class="article-list">` + articles.map(a => {
+      container.innerHTML = `<div class="article-list">` + articles.map((a, i) => {
         const timeAgo = a.publishedAt ? getTimeAgo(a.publishedAt) : '';
         const fav = a.favicon ? `<img src="${escapeHtml(a.favicon)}" alt="" style="width:20px;height:20px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">` : '';
-        return `
+        const showThumb = i < 2;
+        const thumbUrl = showThumb ? (a.thumbnail || `https://image.thum.io/get/width/400/crop/200/${escapeHtml(a.url)}`) : '';
+        return showThumb ? `
+          <a class="article-card" href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="padding:0;flex-direction:column;gap:0;overflow:hidden;">
+            <div style="width:100%;height:100px;overflow:hidden;position:relative;">
+              <img src="${thumbUrl}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'" style="width:100%;height:100%;object-fit:cover;">
+              <div style="position:absolute;inset:0;background:linear-gradient(0deg, var(--bg-elevated) 0%, transparent 50%);"></div>
+            </div>
+            <div style="padding:10px 14px 12px;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">${fav}<div class="article-source" style="margin:0;">${escapeHtml(a.source || 'Web')}</div></div>
+              <div class="article-title" style="font-size:13px;margin:0;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(a.title)}</div>
+              <div class="article-time" style="margin-top:4px;">${timeAgo}</div>
+            </div>
+          </a>` : `
           <a class="article-card" href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="padding:12px 14px;">
             ${fav ? `<div style="width:32px;height:32px;border-radius:8px;background:var(--bg-hover);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--border);">${fav}</div>` : ''}
             <div style="flex:1;min-width:0;">
@@ -5727,12 +5740,27 @@
             tempDiv.innerHTML = description;
             const snippet = tempDiv.textContent || tempDiv.innerText || '';
 
-            // Get source favicon
+            // Derive favicon from source name (Google News URLs are redirects)
             let favicon = '';
-            try {
-              const urlObj = new URL(link);
-              favicon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=64`;
-            } catch(e) {}
+            if (source) {
+              const domainGuess = source.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+              const knownDomains = {
+                'politico': 'politico.com', 'reuters': 'reuters.com', 'cnn': 'cnn.com',
+                'nytimes': 'nytimes.com', 'thenewyorktimes': 'nytimes.com', 'washingtonpost': 'washingtonpost.com',
+                'thehill': 'thehill.com', 'bbc': 'bbc.com', 'bbcnews': 'bbc.com',
+                'foxnews': 'foxnews.com', 'nbcnews': 'nbcnews.com', 'cbsnews': 'cbsnews.com',
+                'abcnews': 'abcnews.go.com', 'apnews': 'apnews.com', 'bloomberg': 'bloomberg.com',
+                'theguardian': 'theguardian.com', 'forbes': 'forbes.com', 'cnbc': 'cnbc.com',
+                'npr': 'npr.org', 'usatoday': 'usatoday.com', 'axios': 'axios.com',
+                'theatlantic': 'theatlantic.com', 'wired': 'wired.com', 'techcrunch': 'techcrunch.com',
+                'theverge': 'theverge.com', 'vox': 'vox.com', 'businessinsider': 'businessinsider.com',
+                'insider': 'insider.com', 'msnbc': 'msnbc.com', 'dailymail': 'dailymail.co.uk',
+                'yahoo': 'yahoo.com', 'yahoonews': 'news.yahoo.com',
+              };
+              const key = source.toLowerCase().replace(/[\s\.\-\'\"]+/g, '');
+              const domain = knownDomains[key] || domainGuess;
+              favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+            }
 
             articles.push({
               id: 'art-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
@@ -5997,9 +6025,10 @@
 
           if (showFeatured) {
             const hue = keywordHue(a.keyword || a.source || 'news');
-            const gradientBg = a.thumbnail
-              ? `<img src="${escapeHtml(a.thumbnail)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" style="width:100%;height:100%;object-fit:cover;"><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;background:linear-gradient(135deg, hsl(${hue},70%,20%) 0%, hsl(${hue+40},60%,12%) 100%);"><span style="font-size:42px;opacity:0.25;">${svgIcon('ico-rss', 42)}</span></div>`
-              : `<div style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;background:linear-gradient(135deg, hsl(${hue},70%,20%) 0%, hsl(${hue+40},60%,12%) 100%);"><span style="font-size:42px;opacity:0.25;">${svgIcon('ico-rss', 42)}</span></div>`;
+            const fallbackGradient = `background:linear-gradient(135deg, hsl(${hue},70%,20%) 0%, hsl(${hue+40},60%,12%) 100%)`;
+            // Use thum.io for live page screenshot thumbnails
+            const thumbSrc = a.thumbnail || `https://image.thum.io/get/width/600/crop/340/${escapeHtml(a.url)}`;
+            const gradientBg = `<img src="${thumbSrc}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" style="width:100%;height:100%;object-fit:cover;"><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;${fallbackGradient};"><span style="font-size:42px;opacity:0.25;">${svgIcon('ico-rss', 42)}</span></div>`;
 
             html += `
             <div class="article-card" style="position:relative;flex-direction:column;gap:0;padding:0;overflow:hidden;">
