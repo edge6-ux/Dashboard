@@ -2589,25 +2589,40 @@
         <!-- Stats -->
         <div class="stats-row anim anim-1">
           <div class="stat-card" style="--stat-color: var(--accent);">
-            <div class="stat-icon"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><use href="#ico-cpu"/></svg></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <div class="stat-icon"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><use href="#ico-cpu"/></svg></div>
+              <svg width="44" height="44" viewBox="0 0 44 44" id="agentRing">
+                <circle cx="22" cy="22" r="18" fill="none" stroke="var(--border)" stroke-width="3"/>
+                <circle cx="22" cy="22" r="18" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="113" stroke-dashoffset="113" transform="rotate(-90 22 22)" style="transition:stroke-dashoffset 1s ease;"/>
+              </svg>
+            </div>
             <div class="stat-value" id="statAgentCount">–</div>
             <div class="stat-label">Active Agents</div>
             <div class="stat-badge" id="statAgentBadge" style="opacity:0.6;">Checking...</div>
           </div>
           <div class="stat-card" style="--stat-color: var(--cyan);">
-            <div class="stat-icon"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><use href="#ico-clipboard"/></svg></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <div class="stat-icon"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><use href="#ico-clipboard"/></svg></div>
+              <div id="jobSparkline" style="display:flex;align-items:flex-end;gap:2px;height:28px;"></div>
+            </div>
             <div class="stat-value" id="statJobs">0</div>
             <div class="stat-label">Scheduled Jobs</div>
-            <div class="stat-badge tag-cyan"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="display:inline;vertical-align:-2px;margin-right:4px;"><use href="#ico-bolt"/></svg> Automated</div>
+            <div class="stat-badge tag-cyan">${svgIcon('ico-bolt', 11)} Automated</div>
           </div>
           <div class="stat-card" style="--stat-color: var(--ok);">
-            <div class="stat-icon"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><use href="#ico-check-circle"/></svg></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <div class="stat-icon"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><use href="#ico-check-circle"/></svg></div>
+              <div id="completedTrend" style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ok);display:flex;align-items:center;gap:4px;"></div>
+            </div>
             <div class="stat-value" id="statCompleted">0</div>
             <div class="stat-label">Runs Completed</div>
-            <div class="stat-badge tag-green">↑ This week</div>
+            <div class="stat-badge tag-green" id="statCompletedBadge">↑ This week</div>
           </div>
           <div class="stat-card" style="--stat-color: var(--warn);">
-            <div class="stat-icon"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><use href="#ico-clock"/></svg></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <div class="stat-icon"><svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><use href="#ico-clock"/></svg></div>
+              <div id="countdownTimer" style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--warn);"></div>
+            </div>
             <div class="stat-value" id="statNextRun">—</div>
             <div class="stat-label">Next Scheduled Run</div>
             <div class="stat-badge tag-yellow" id="statNextLabel">—</div>
@@ -3324,13 +3339,92 @@
 
     let dashCalDate = new Date();
 
+    // Animated counter
+    function animateCounter(el, target, duration = 600) {
+      const start = parseInt(el.textContent) || 0;
+      if (start === target) return;
+      const diff = target - start;
+      const startTime = performance.now();
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        el.textContent = Math.round(start + diff * eased);
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    // Live countdown for next run
+    let _nextRunMs = null;
+    function updateCountdown() {
+      const el = document.getElementById('countdownTimer');
+      if (!el || !_nextRunMs) { if (el) el.textContent = ''; return; }
+      const diff = _nextRunMs - Date.now();
+      if (diff <= 0) { el.textContent = 'Now'; return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      el.textContent = h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+    }
+    setInterval(updateCountdown, 1000);
+
     function renderDashboard() {
       const jobs = getAllJobs();
       const activeJobs = jobs.filter(j => j.enabled !== false);
+      const completedCount = _dbTasks.filter(t => t.status === 'completed').length;
+      const runningCount = _dbTasks.filter(t => t.status === 'running').length;
 
-      // Stats
-      document.getElementById('statJobs').textContent = activeJobs.length;
-      document.getElementById('statCompleted').textContent = jobs.filter(j => j.lastRun).length;
+      // Animated stat values
+      animateCounter(document.getElementById('statJobs'), activeJobs.length);
+      animateCounter(document.getElementById('statCompleted'), completedCount);
+
+      // Agent ring — fill based on online ratio
+      const onlineCount = Object.values(AGENTS).filter(a => a.status === 'online').length;
+      const totalAgents = Object.keys(AGENTS).length;
+      const ring = document.querySelector('#agentRing circle:last-child');
+      if (ring) {
+        const circumference = 113; // 2 * PI * 18
+        const pct = totalAgents > 0 ? onlineCount / totalAgents : 0;
+        ring.style.strokeDashoffset = circumference - (circumference * pct);
+      }
+
+      // Job sparkline — mini bar chart showing job distribution
+      const sparkEl = document.getElementById('jobSparkline');
+      if (sparkEl) {
+        const bars = [];
+        const allTasks = _dbTasks.slice(0, 7);
+        const statuses = { completed: 'var(--ok)', running: 'var(--info)', queued: 'var(--warn)', error: 'var(--danger)' };
+        if (allTasks.length === 0) {
+          for (let i = 0; i < 7; i++) bars.push(`<div style="width:4px;height:${4 + Math.random()*8}px;background:var(--border);border-radius:2px;transition:height 0.3s;"></div>`);
+        } else {
+          allTasks.forEach(t => {
+            const h = t.progress ? Math.max(4, (t.progress / 100) * 28) : 6;
+            bars.push(`<div style="width:4px;height:${h}px;background:${statuses[t.status] || 'var(--border)'};border-radius:2px;transition:height 0.3s;"></div>`);
+          });
+        }
+        sparkEl.innerHTML = bars.join('');
+      }
+
+      // Completed trend indicator
+      const trendEl = document.getElementById('completedTrend');
+      if (trendEl) {
+        if (runningCount > 0) {
+          trendEl.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--info);animation:pulse 1.5s ease-in-out infinite;"></span> ${runningCount} running`;
+          trendEl.style.color = 'var(--info)';
+        } else if (completedCount > 0) {
+          trendEl.innerHTML = `↑ ${completedCount}`;
+          trendEl.style.color = 'var(--ok)';
+        } else {
+          trendEl.textContent = '';
+        }
+      }
+
+      // Completed badge
+      const completedBadge = document.getElementById('statCompletedBadge');
+      if (completedBadge) {
+        completedBadge.textContent = completedCount > 0 ? `${completedCount} total` : 'No runs yet';
+      }
 
       // Next run
       const now = Date.now();
@@ -3338,9 +3432,15 @@
       if (nextRuns.length > 0) {
         const next = nextRuns[0];
         const d = new Date(next.nextRun);
+        _nextRunMs = next.nextRun;
         document.getElementById('statNextRun').textContent = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/New_York' });
         document.getElementById('statNextLabel').textContent = next.name;
+      } else {
+        _nextRunMs = null;
+        document.getElementById('statNextRun').textContent = '—';
+        document.getElementById('statNextLabel').textContent = 'No upcoming runs';
       }
+      updateCountdown();
 
       // Tracker widget
       renderDashTrackerWidget();
