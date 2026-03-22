@@ -3608,23 +3608,10 @@
         return;
       }
 
-      container.innerHTML = `<div class="article-list">` + articles.map((a, i) => {
+      container.innerHTML = `<div class="article-list">` + articles.map(a => {
         const timeAgo = a.publishedAt ? getTimeAgo(a.publishedAt) : '';
         const fav = a.favicon ? `<img src="${escapeHtml(a.favicon)}" alt="" style="width:20px;height:20px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">` : '';
-        const showThumb = i < 2;
-        const thumbUrl = showThumb ? (a.thumbnail || `https://image.thum.io/get/width/400/crop/200/${escapeHtml(a.url)}`) : '';
-        return showThumb ? `
-          <a class="article-card" href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="padding:0;flex-direction:column;gap:0;overflow:hidden;">
-            <div style="width:100%;height:100px;overflow:hidden;position:relative;">
-              <img src="${thumbUrl}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'" style="width:100%;height:100%;object-fit:cover;">
-              <div style="position:absolute;inset:0;background:linear-gradient(0deg, var(--bg-elevated) 0%, transparent 50%);"></div>
-            </div>
-            <div style="padding:10px 14px 12px;">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">${fav}<div class="article-source" style="margin:0;">${escapeHtml(a.source || 'Web')}</div></div>
-              <div class="article-title" style="font-size:13px;margin:0;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(a.title)}</div>
-              <div class="article-time" style="margin-top:4px;">${timeAgo}</div>
-            </div>
-          </a>` : `
+        return `
           <a class="article-card" href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="padding:12px 14px;">
             ${fav ? `<div style="width:32px;height:32px;border-radius:8px;background:var(--bg-hover);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--border);">${fav}</div>` : ''}
             <div style="flex:1;min-width:0;">
@@ -6025,17 +6012,14 @@
 
           if (showFeatured) {
             const hue = keywordHue(a.keyword || a.source || 'news');
-            const fallbackGradient = `background:linear-gradient(135deg, hsl(${hue},70%,20%) 0%, hsl(${hue+40},60%,12%) 100%)`;
-            // Use thum.io for live page screenshot thumbnails
-            const thumbSrc = a.thumbnail || `https://image.thum.io/get/width/600/crop/340/${escapeHtml(a.url)}`;
-            const gradientBg = `<img src="${thumbSrc}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" style="width:100%;height:100%;object-fit:cover;"><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;${fallbackGradient};"><span style="font-size:42px;opacity:0.25;">${svgIcon('ico-rss', 42)}</span></div>`;
+            const fallbackGradient = `background:linear-gradient(135deg, hsl(${hue},65%,18%) 0%, hsl(${hue+40},55%,10%) 100%)`;
 
             html += `
             <div class="article-card" style="position:relative;flex-direction:column;gap:0;padding:0;overflow:hidden;">
               <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;color:inherit;">
-                <div style="position:relative;width:100%;height:160px;overflow:hidden;">
-                  ${gradientBg}
-                  <div style="position:absolute;inset:0;background:linear-gradient(0deg, var(--bg-elevated) 0%, transparent 55%);"></div>
+                <div style="position:relative;width:100%;height:140px;overflow:hidden;display:flex;align-items:center;justify-content:center;${fallbackGradient};">
+                  ${a.favicon ? `<img src="${escapeHtml(a.favicon)}" alt="" style="width:48px;height:48px;border-radius:12px;opacity:0.8;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4));" onerror="this.style.display='none'">` : `<span style="opacity:0.2;">${svgIcon('ico-rss', 42)}</span>`}
+                  <div style="position:absolute;inset:0;background:linear-gradient(0deg, var(--bg-elevated) 0%, transparent 50%);"></div>
                   <div style="position:absolute;top:12px;left:14px;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.55);padding:3px 10px;border-radius:var(--radius-full);backdrop-filter:blur(8px);font-size:11px;font-weight:600;color:#fff;">${faviconHtml}<span>${escapeHtml(a.source || 'Web')}</span></div>
                 </div>
                 <div style="padding:14px 18px 16px;">
