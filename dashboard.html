@@ -5970,13 +5970,34 @@
           </div>`;
       } else {
         html += `<div class="article-list">`;
-        filteredArticles.forEach(a => {
+        let _thumbCount = 0;
+        filteredArticles.forEach((a, idx) => {
           const timeAgo = a.publishedAt ? getTimeAgo(a.publishedAt) : '';
           const saved = isArticleSaved(a.id);
-          html += `
+          const showFeatured = a.thumbnail && _thumbCount < 3 && (idx % 3 === 0 || idx < 2);
+          if (showFeatured) _thumbCount++;
+
+          if (showFeatured) {
+            html += `
+            <div class="article-card" style="position:relative;flex-direction:column;gap:0;padding:0;overflow:hidden;">
+              <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;color:inherit;">
+                <div style="position:relative;width:100%;height:180px;overflow:hidden;">
+                  <img src="${escapeHtml(a.thumbnail)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'" style="width:100%;height:100%;object-fit:cover;">
+                  <div style="position:absolute;inset:0;background:linear-gradient(0deg, var(--bg-elevated) 0%, transparent 60%);"></div>
+                  <div class="article-source" style="position:absolute;top:12px;left:14px;background:rgba(0,0,0,0.5);padding:2px 8px;border-radius:var(--radius-full);backdrop-filter:blur(8px);">${escapeHtml(a.source || 'Web')}</div>
+                </div>
+                <div style="padding:14px 18px 16px;">
+                  <div class="article-title" style="font-size:16px;margin:0 0 6px;">${escapeHtml(a.title)}</div>
+                  ${a.snippet ? `<div class="article-snippet">${escapeHtml(a.snippet)}</div>` : ''}
+                  <div class="article-time" style="margin-top:8px;">${escapeHtml(a.keyword)} · ${timeAgo}</div>
+                </div>
+              </a>
+              <button onclick="event.stopPropagation();toggleSaveArticle('${a.id}','${tracker.id}');" style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.5);border:none;cursor:pointer;color:${saved ? 'var(--accent)' : '#fff'};padding:6px;border-radius:8px;backdrop-filter:blur(8px);transition:color 0.15s;" title="${saved ? 'Unsave' : 'Save'}">${saved ? svgIcon('ico-bookmark-fill', 16) : svgIcon('ico-bookmark', 16)}</button>
+            </div>`;
+          } else {
+            html += `
             <div class="article-card" style="position:relative;">
               <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="display:flex;gap:16px;flex:1;min-width:0;text-decoration:none;color:inherit;">
-                ${a.thumbnail ? `<img class="article-thumb" src="${escapeHtml(a.thumbnail)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
                 <div style="flex:1;min-width:0;">
                   <div class="article-source">${svgIcon('ico-external', 11)}<span>${escapeHtml(a.source || 'Web')}</span></div>
                   <div class="article-title">${escapeHtml(a.title)}</div>
@@ -5986,6 +6007,7 @@
               </a>
               <button onclick="event.stopPropagation();toggleSaveArticle('${a.id}','${tracker.id}');" style="position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;color:${saved ? 'var(--accent)' : 'var(--muted)'};padding:4px;transition:color 0.15s;" title="${saved ? 'Unsave' : 'Save'}">${saved ? svgIcon('ico-bookmark-fill', 16) : svgIcon('ico-bookmark', 16)}</button>
             </div>`;
+          }
         });
         html += `</div>`;
       }
