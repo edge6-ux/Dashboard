@@ -336,11 +336,19 @@
       font-family: var(--font-display);
       font-size: 15px;
       font-weight: 700;
-      background: linear-gradient(135deg, var(--text-strong) 40%, var(--accent) 100%);
+      background: linear-gradient(135deg, var(--text-strong) 30%, var(--accent) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       letter-spacing: -0.03em;
+      position: relative;
+      padding: 4px 0;
+      text-shadow: none;
+      filter: drop-shadow(0 0 12px rgba(var(--accent-rgb), 0.3));
+      transition: filter 0.25s ease;
+    }
+    .topbar-title:hover {
+      filter: drop-shadow(0 0 20px rgba(var(--accent-rgb), 0.5));
     }
 
     .topbar-breadcrumb {
@@ -2543,7 +2551,7 @@
 
     <!-- Topbar -->
     <header class="topbar">
-      <span class="topbar-title">Command Center</span>
+      <span class="topbar-title" onclick="showPage('dashboard')" style="cursor:pointer;">Command Center</span>
       <span class="topbar-breadcrumb" id="topbarBreadcrumb">/ Dashboard</span>
 
       <div class="topbar-right">
