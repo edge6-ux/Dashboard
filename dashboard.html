@@ -3610,9 +3610,10 @@
 
       container.innerHTML = `<div class="article-list">` + articles.map(a => {
         const timeAgo = a.publishedAt ? getTimeAgo(a.publishedAt) : '';
+        const fav = a.favicon ? `<img src="${escapeHtml(a.favicon)}" alt="" style="width:20px;height:20px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">` : '';
         return `
           <a class="article-card" href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="padding:12px 14px;">
-            ${a.thumbnail ? `<img class="article-thumb" src="${escapeHtml(a.thumbnail)}" alt="" loading="lazy" onerror="this.style.display='none'" style="width:72px;height:54px;">` : ''}
+            ${fav ? `<div style="width:32px;height:32px;border-radius:8px;background:var(--bg-hover);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--border);">${fav}</div>` : ''}
             <div style="flex:1;min-width:0;">
               <div class="article-source">${escapeHtml(a.source || 'Web')}</div>
               <div class="article-title" style="font-size:13px;margin:2px 0;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(a.title)}</div>
@@ -5726,6 +5727,13 @@
             tempDiv.innerHTML = description;
             const snippet = tempDiv.textContent || tempDiv.innerText || '';
 
+            // Get source favicon
+            let favicon = '';
+            try {
+              const urlObj = new URL(link);
+              favicon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=64`;
+            } catch(e) {}
+
             articles.push({
               id: 'art-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
               title: cleanTitle,
@@ -5733,6 +5741,7 @@
               snippet: snippet.slice(0, 200),
               url: link,
               thumbnail: thumb,
+              favicon,
               publishedAt: pubDate ? new Date(pubDate).getTime() : Date.now(),
               keyword
             });
@@ -5970,21 +5979,35 @@
           </div>`;
       } else {
         html += `<div class="article-list">`;
-        let _thumbCount = 0;
+        // Generate gradient hue from keyword string
+        function keywordHue(str) {
+          let h = 0;
+          for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
+          return Math.abs(h) % 360;
+        }
+
+        let _featuredCount = 0;
         filteredArticles.forEach((a, idx) => {
           const timeAgo = a.publishedAt ? getTimeAgo(a.publishedAt) : '';
           const saved = isArticleSaved(a.id);
-          const showFeatured = a.thumbnail && _thumbCount < 3 && (idx % 3 === 0 || idx < 2);
-          if (showFeatured) _thumbCount++;
+          const showFeatured = _featuredCount < 3 && (idx % 4 === 0);
+          if (showFeatured) _featuredCount++;
+
+          const faviconHtml = a.favicon ? `<img src="${escapeHtml(a.favicon)}" alt="" style="width:16px;height:16px;border-radius:3px;flex-shrink:0;" onerror="this.style.display='none'">` : '';
 
           if (showFeatured) {
+            const hue = keywordHue(a.keyword || a.source || 'news');
+            const gradientBg = a.thumbnail
+              ? `<img src="${escapeHtml(a.thumbnail)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" style="width:100%;height:100%;object-fit:cover;"><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;background:linear-gradient(135deg, hsl(${hue},70%,20%) 0%, hsl(${hue+40},60%,12%) 100%);"><span style="font-size:42px;opacity:0.25;">${svgIcon('ico-rss', 42)}</span></div>`
+              : `<div style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;background:linear-gradient(135deg, hsl(${hue},70%,20%) 0%, hsl(${hue+40},60%,12%) 100%);"><span style="font-size:42px;opacity:0.25;">${svgIcon('ico-rss', 42)}</span></div>`;
+
             html += `
             <div class="article-card" style="position:relative;flex-direction:column;gap:0;padding:0;overflow:hidden;">
               <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;color:inherit;">
-                <div style="position:relative;width:100%;height:180px;overflow:hidden;">
-                  <img src="${escapeHtml(a.thumbnail)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'" style="width:100%;height:100%;object-fit:cover;">
-                  <div style="position:absolute;inset:0;background:linear-gradient(0deg, var(--bg-elevated) 0%, transparent 60%);"></div>
-                  <div class="article-source" style="position:absolute;top:12px;left:14px;background:rgba(0,0,0,0.5);padding:2px 8px;border-radius:var(--radius-full);backdrop-filter:blur(8px);">${escapeHtml(a.source || 'Web')}</div>
+                <div style="position:relative;width:100%;height:160px;overflow:hidden;">
+                  ${gradientBg}
+                  <div style="position:absolute;inset:0;background:linear-gradient(0deg, var(--bg-elevated) 0%, transparent 55%);"></div>
+                  <div style="position:absolute;top:12px;left:14px;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.55);padding:3px 10px;border-radius:var(--radius-full);backdrop-filter:blur(8px);font-size:11px;font-weight:600;color:#fff;">${faviconHtml}<span>${escapeHtml(a.source || 'Web')}</span></div>
                 </div>
                 <div style="padding:14px 18px 16px;">
                   <div class="article-title" style="font-size:16px;margin:0 0 6px;">${escapeHtml(a.title)}</div>
@@ -5992,14 +6015,15 @@
                   <div class="article-time" style="margin-top:8px;">${escapeHtml(a.keyword)} · ${timeAgo}</div>
                 </div>
               </a>
-              <button onclick="event.stopPropagation();toggleSaveArticle('${a.id}','${tracker.id}');" style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.5);border:none;cursor:pointer;color:${saved ? 'var(--accent)' : '#fff'};padding:6px;border-radius:8px;backdrop-filter:blur(8px);transition:color 0.15s;" title="${saved ? 'Unsave' : 'Save'}">${saved ? svgIcon('ico-bookmark-fill', 16) : svgIcon('ico-bookmark', 16)}</button>
+              <button onclick="event.stopPropagation();toggleSaveArticle('${a.id}','${tracker.id}');" style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.55);border:none;cursor:pointer;color:${saved ? 'var(--accent)' : '#fff'};padding:6px;border-radius:8px;backdrop-filter:blur(8px);transition:color 0.15s;" title="${saved ? 'Unsave' : 'Save'}">${saved ? svgIcon('ico-bookmark-fill', 16) : svgIcon('ico-bookmark', 16)}</button>
             </div>`;
           } else {
             html += `
             <div class="article-card" style="position:relative;">
-              <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="display:flex;gap:16px;flex:1;min-width:0;text-decoration:none;color:inherit;">
+              <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="display:flex;gap:14px;flex:1;min-width:0;text-decoration:none;color:inherit;">
+                ${faviconHtml ? `<div style="width:32px;height:32px;border-radius:8px;background:var(--bg-hover);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--border);overflow:hidden;">${faviconHtml.replace('width:16px;height:16px;', 'width:20px;height:20px;')}</div>` : ''}
                 <div style="flex:1;min-width:0;">
-                  <div class="article-source">${svgIcon('ico-external', 11)}<span>${escapeHtml(a.source || 'Web')}</span></div>
+                  <div class="article-source">${escapeHtml(a.source || 'Web')}</div>
                   <div class="article-title">${escapeHtml(a.title)}</div>
                   ${a.snippet ? `<div class="article-snippet">${escapeHtml(a.snippet)}</div>` : ''}
                   <div class="article-time">${escapeHtml(a.keyword)} · ${timeAgo}</div>
