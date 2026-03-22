@@ -3129,6 +3129,36 @@
     </div>
   </div>
 
+  <!-- Auth Screen -->
+  <div id="authScreen" style="display:none;position:fixed;inset:0;z-index:5000;background:var(--bg);align-items:center;justify-content:center;">
+    <div style="width:380px;max-width:90vw;">
+      <div style="text-align:center;margin-bottom:32px;">
+        <div style="width:56px;height:56px;border-radius:16px;background:var(--gradient-accent-chrome);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 4px 28px var(--accent-glow);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5Z" fill="#000" opacity="0.9"/><path d="M2 17l10 5 10-5" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/><path d="M2 12l10 5 10-5" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.72"/></svg>
+        </div>
+        <div style="font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--text-strong);letter-spacing:-0.04em;">Mission Control</div>
+        <div style="color:var(--muted-fg);font-size:13px;margin-top:4px;">Sign in to your command center</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:28px;box-shadow:var(--shadow-card);">
+        <div id="authError" style="display:none;padding:10px 14px;background:var(--danger-subtle);border:1px solid rgba(251,113,133,0.2);border-radius:var(--radius);color:var(--danger);font-size:12px;margin-bottom:16px;"></div>
+        <div id="authSuccess" style="display:none;padding:10px 14px;background:var(--ok-subtle);border:1px solid rgba(74,222,128,0.2);border-radius:var(--radius);color:var(--ok);font-size:12px;margin-bottom:16px;"></div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Email</label>
+          <input class="form-input" id="authEmail" type="email" placeholder="you@example.com" />
+        </div>
+        <div class="form-group" style="margin-bottom:20px;">
+          <label class="form-label">Password</label>
+          <input class="form-input" id="authPassword" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')authSubmit()" />
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" id="authBtn" onclick="authSubmit()">Sign In</button>
+        <div style="text-align:center;margin-top:14px;">
+          <span style="color:var(--muted-fg);font-size:12px;" id="authToggleText">Don't have an account?</span>
+          <button onclick="toggleAuthMode()" style="background:none;border:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;padding:0;margin-left:4px;" id="authToggleBtn">Sign Up</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
@@ -6212,27 +6242,192 @@
     document.querySelector('.color-swatch').style.borderColor = '#fff';
 
     // Apply cancelled/deleted job state on load + purge old trash
-    (function initJobState() {
+    // ═══════════════════════════════════════════════
+    //  AUTH
+    // ═══════════════════════════════════════════════
+
+    const AUTH_SESSION_KEY = 'mc-auth-session';
+    let _authMode = 'signin'; // 'signin' or 'signup'
+    let _currentUser = null;
+
+    function getStoredSession() {
+      try { return JSON.parse(localStorage.getItem(AUTH_SESSION_KEY)); } catch { return null; }
+    }
+    function storeSession(session) {
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+    }
+    function clearSession() {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+    }
+
+    // User-scoped storage key prefix
+    function userKey(key) {
+      return _currentUser ? `${key}:${_currentUser.id}` : key;
+    }
+
+    // Override storage functions to be user-scoped
+    const _origLoadLocalJobs = loadLocalJobs;
+    const _origSaveLocalJobs = saveLocalJobs;
+    loadLocalJobs = function() { try { return JSON.parse(localStorage.getItem(userKey('mc-custom-jobs')) || '[]'); } catch { return []; } };
+    saveLocalJobs = function(jobs) { localStorage.setItem(userKey('mc-custom-jobs'), JSON.stringify(jobs)); };
+
+    const _origLoadTrackers = loadTrackers;
+    const _origSaveTrackers = saveTrackers;
+    loadTrackers = function() { try { return JSON.parse(localStorage.getItem(userKey(TRACKER_STORAGE_KEY)) || '[]'); } catch { return []; } };
+    saveTrackers = function(t) { localStorage.setItem(userKey(TRACKER_STORAGE_KEY), JSON.stringify(t)); };
+
+    const _origLoadTrackerArticles = loadTrackerArticles;
+    const _origSaveTrackerArticles = saveTrackerArticles;
+    loadTrackerArticles = function() { try { return JSON.parse(localStorage.getItem(userKey(TRACKER_ARTICLES_KEY)) || '{}'); } catch { return {}; } };
+    saveTrackerArticles = function(a) { localStorage.setItem(userKey(TRACKER_ARTICLES_KEY), JSON.stringify(a)); };
+
+    loadSavedArticles = function() { try { return JSON.parse(localStorage.getItem(userKey(SAVED_ARTICLES_KEY)) || '[]'); } catch { return []; } };
+    saveSavedArticles = function(a) { localStorage.setItem(userKey(SAVED_ARTICLES_KEY), JSON.stringify(a)); };
+
+    loadNotifications = function() { try { return JSON.parse(localStorage.getItem(userKey(NOTIF_KEY)) || '[]'); } catch { return []; } };
+    saveNotifications = function(n) { localStorage.setItem(userKey(NOTIF_KEY), JSON.stringify(n.slice(0, NOTIF_MAX))); };
+
+    function toggleAuthMode() {
+      _authMode = _authMode === 'signin' ? 'signup' : 'signin';
+      document.getElementById('authBtn').textContent = _authMode === 'signin' ? 'Sign In' : 'Create Account';
+      document.getElementById('authToggleText').textContent = _authMode === 'signin' ? "Don't have an account?" : 'Already have an account?';
+      document.getElementById('authToggleBtn').textContent = _authMode === 'signin' ? 'Sign Up' : 'Sign In';
+      document.getElementById('authError').style.display = 'none';
+      document.getElementById('authSuccess').style.display = 'none';
+    }
+
+    async function authSubmit() {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const errEl = document.getElementById('authError');
+      const successEl = document.getElementById('authSuccess');
+      const btn = document.getElementById('authBtn');
+
+      errEl.style.display = 'none';
+      successEl.style.display = 'none';
+
+      if (!email || !password) { errEl.textContent = 'Enter email and password'; errEl.style.display = 'block'; return; }
+      if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; errEl.style.display = 'block'; return; }
+
+      btn.disabled = true;
+      btn.textContent = _authMode === 'signin' ? 'Signing in...' : 'Creating account...';
+
+      try {
+        const endpoint = _authMode === 'signin'
+          ? `${SUPABASE_URL}/auth/v1/token?grant_type=password`
+          : `${SUPABASE_URL}/auth/v1/signup`;
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          errEl.textContent = data.msg || data.error_description || data.error || 'Authentication failed';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        if (_authMode === 'signup' && !data.access_token) {
+          // Email confirmation required
+          successEl.textContent = 'Account created! Check your email to confirm, then sign in.';
+          successEl.style.display = 'block';
+          _authMode = 'signin';
+          document.getElementById('authBtn').textContent = 'Sign In';
+          document.getElementById('authToggleText').textContent = "Don't have an account?";
+          document.getElementById('authToggleBtn').textContent = 'Sign Up';
+          return;
+        }
+
+        // Success — store session and boot dashboard
+        storeSession({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user });
+        _currentUser = data.user;
+        bootDashboard();
+      } catch (e) {
+        errEl.textContent = 'Connection error. Try again.';
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = _authMode === 'signin' ? 'Sign In' : 'Create Account';
+      }
+    }
+
+    async function refreshSession() {
+      const session = getStoredSession();
+      if (!session?.refresh_token) return false;
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+          method: 'POST',
+          headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: session.refresh_token })
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        storeSession({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user });
+        _currentUser = data.user;
+        return true;
+      } catch { return false; }
+    }
+
+    function signOut() {
+      clearSession();
+      _currentUser = null;
+      document.getElementById('authScreen').style.display = 'flex';
+      document.querySelector('.app').style.display = 'none';
+    }
+
+    function bootDashboard() {
+      document.getElementById('authScreen').style.display = 'none';
+      document.querySelector('.app').style.display = 'grid';
+
+      // Update avatar with user initial
+      const initial = _currentUser?.email?.[0]?.toUpperCase() || 'U';
+      document.querySelector('.topbar-avatar').textContent = initial;
+      document.querySelector('.topbar-avatar').title = _currentUser?.email || '';
+      document.querySelector('.topbar-avatar').style.cursor = 'pointer';
+      document.querySelector('.topbar-avatar').onclick = function() {
+        if (confirm('Sign out of ' + (_currentUser?.email || 'your account') + '?')) signOut();
+      };
+
+      // Init job state
       const cancelled = getCancelledJobs();
       const trash = getTrash();
       const deletedCronIds = new Set(trash.filter(t => t._trashType === 'cron-job').map(t => t.id));
-
       cancelled.forEach(id => {
         const job = CRON_JOBS.find(j => j.id === id);
-        if (job) {
-          job.enabled = false;
-          job.status = 'disabled';
-          if (deletedCronIds.has(id)) job._deleted = true;
-        }
+        if (job) { job.enabled = false; job.status = 'disabled'; if (deletedCronIds.has(id)) job._deleted = true; }
       });
-
       purgeOldTrash();
-    })();
+      renderNotifBadge();
 
-    Promise.all([
-      loadTasksFromDB().catch(() => {}),
-      loadOutputArtifacts()
-    ]).finally(() => showPage('dashboard'));
+      Promise.all([
+        loadTasksFromDB().catch(() => {}),
+        loadOutputArtifacts()
+      ]).finally(() => showPage('dashboard'));
+    }
+
+    // ═══════════════════════════════════════════════
+    //  BOOT
+    // ═══════════════════════════════════════════════
+
+    // Hide dashboard, show auth or auto-login
+    document.querySelector('.app').style.display = 'none';
+
+    (async function init() {
+      const session = getStoredSession();
+      if (session?.access_token && session?.user) {
+        _currentUser = session.user;
+        // Try refresh in background
+        refreshSession();
+        bootDashboard();
+      } else {
+        document.getElementById('authScreen').style.display = 'flex';
+      }
+    })();
   </script>
 </body>
 </html>
