@@ -6483,13 +6483,23 @@
       const session = getStoredSession();
       if (session?.access_token && session?.user) {
         _currentUser = session.user;
-        // Try refresh in background
-        refreshSession();
+        // Try to refresh token — if it fails, still boot with cached session
+        refreshSession().catch(() => {});
         bootDashboard();
+      } else if (session?.refresh_token) {
+        // Access token gone but refresh token exists — try to restore
+        const ok = await refreshSession();
+        if (ok) { bootDashboard(); }
+        else { document.getElementById('authScreen').style.display = 'flex'; }
       } else {
         document.getElementById('authScreen').style.display = 'flex';
       }
     })();
+
+    // Auto-refresh token every 45 minutes to prevent expiry
+    setInterval(() => {
+      if (_currentUser) refreshSession().catch(() => {});
+    }, 45 * 60 * 1000);
   </script>
 </body>
 </html>
