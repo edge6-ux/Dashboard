@@ -1,0 +1,42 @@
+{
+  "tasks": [
+    {
+      "id": "briefing-109478ad",
+      "name": "Daily Briefing",
+      "agent": "gordon",
+      "status": "completed",
+      "type": "recurring",
+      "description": "Search the web for the latest news in: (1) Regenerative agriculture (2) MAHA (3) Rural area and small business policy. Only include stories from the last 24 hours.",
+      "createdAt": 1773948105745,
+      "updatedAt": 1774142640891,
+      "completedAt": 1774142640891,
+      "color": "#06b6d4",
+      "schedule": "Weekdays at 8:30am",
+      "error": null,
+      "links": [],
+      "documents": [],
+      "progress": 100
+    },
+    {
+      "id": "task-277e5a1b9f",
+      "jobName": "Armed Forces Wellness Center Overview 2",
+      "name": "Armed Forces Wellness Center Overview 2",
+      "agent": "gordon",
+      "status": "completed",
+      "type": "one-time",
+      "description": "Create a one-page overview on what Armed Forces Wellness Centers are. Include whether they are run by the military or non-profit organizations. Keep it surface-level to familiarize the team.",
+      "createdAt": 1774167480000,
+      "updatedAt": 1774167540000,
+      "completedAt": 1774167540000,
+      "color": "#06b6d4",
+      "schedule": "ASAP",
+      "time": "",
+      "timezone": "America/New_York",
+      "delivery": "announce",
+      "error": null,
+      "links": [],
+      "documents": [{ "name": "Armed_Forces_Wellness_Centers_Overview.html" }],
+      "progress": 100
+    }
+  ]
+}

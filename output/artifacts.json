@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "comment": "When a job writes files to output/ but the task row never gets documents[] updated, map task titles (case-insensitive) to filenames here.",
+  "tasks": [
+    {
+      "matchNames": [
+        "Armed Forces Wellness Center Overview 2",
+        "Armed Forces Wellness Centers 2",
+        "Armed Forces Wellness Centers Overview 2"
+      ],
+      "files": ["Armed_Forces_Wellness_Centers_Overview.html"]
+    }
+  ]
+}
