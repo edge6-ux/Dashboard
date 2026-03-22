@@ -344,24 +344,28 @@
       position: relative;
       padding: 4px 0;
     }
-    .topbar-title::after {
-      content: "Command Center";
+    .topbar-title-glow {
       position: absolute;
       inset: 0;
       font-family: inherit;
       font-size: inherit;
       font-weight: inherit;
       letter-spacing: inherit;
-      padding: inherit;
       color: var(--accent);
-      filter: blur(14px);
-      opacity: 0.4;
+      -webkit-text-fill-color: var(--accent);
+      filter: blur(12px);
+      opacity: 0;
       pointer-events: none;
-      transition: opacity 0.25s ease, filter 0.25s ease;
+      transition: opacity 0.3s ease;
+      user-select: none;
     }
-    .topbar-title:hover::after {
-      opacity: 0.65;
-      filter: blur(18px);
+    .topbar-title:hover .topbar-title-glow {
+      opacity: 0.7;
+      animation: titlePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes titlePulse {
+      0%, 100% { filter: blur(12px); opacity: 0.5; }
+      50% { filter: blur(18px); opacity: 0.8; }
     }
 
     .topbar-breadcrumb {
@@ -2564,7 +2568,7 @@
 
     <!-- Topbar -->
     <header class="topbar">
-      <span class="topbar-title" onclick="showPage('dashboard')" style="cursor:pointer;">Command Center</span>
+      <span class="topbar-title" onclick="showPage('dashboard')" style="cursor:pointer;"><span class="topbar-title-glow">Command Center</span>Command Center</span>
       <span class="topbar-breadcrumb" id="topbarBreadcrumb">/ Dashboard</span>
 
       <div class="topbar-right">
