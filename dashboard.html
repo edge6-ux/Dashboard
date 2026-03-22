@@ -2262,10 +2262,76 @@
     }
 
     @media (max-width: 768px) {
-      .app { grid-template-columns: 1fr; grid-template-areas: "topbar" "main"; }
+      .app { grid-template-columns: 1fr; grid-template-rows: 52px 1fr 56px; grid-template-areas: "topbar" "main" "mobilenav"; }
       .rail { display: none; }
       .form-row { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .stat-card { padding: 14px; }
+      .stat-value { font-size: 24px; }
+      .main { padding: 16px 14px 20px; gap: 16px; }
+      .topbar { padding: 0 14px; }
+      .topbar-title { font-size: 14px; }
+      .topbar-breadcrumb { display: none; }
+      .topbar-clock { display: none; }
+      .theme-hue-picker { display: none; }
+      .section-title { font-size: 18px; }
+      .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .card { padding: 16px; border-radius: var(--radius-lg); }
+      .modal { width: 95vw; max-height: 90vh; border-radius: var(--radius-lg); }
+      .dash-grid { gap: 14px; }
+      .right-panel { gap: 14px; }
+      .tracker-header { flex-direction: column; gap: 12px; }
+      .tracker-keywords { gap: 4px; }
+      .tracker-keyword { font-size: 10px; padding: 2px 8px; }
+      .article-card { padding: 14px; gap: 12px; }
+      .article-title { font-size: 14px; }
+      .article-card[style*="flex-direction:column"] .article-title { font-size: 15px; }
+      .task-card { padding: 14px 16px; border-radius: var(--radius-lg); }
+      .task-description { display: none; }
+      .task-actions { flex-wrap: wrap; }
+      .notif-panel { width: 300px; right: -40px; }
+      .cal-grid { font-size: 11px; }
+      .cal-cell { min-height: 60px !important; padding: 4px !important; }
+      .week-view { font-size: 10px; }
+      .doc-viewer { width: 98vw; height: 95vh; }
+      .doc-viewer-body { padding: 20px 16px; }
+      .job-item { padding: 10px 12px; }
     }
+
+    /* Mobile bottom nav */
+    .mobile-nav {
+      display: none;
+      grid-area: mobilenav;
+      background: rgba(0, 0, 4, 0.9);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 8px;
+      z-index: 50;
+    }
+    @media (max-width: 768px) {
+      .mobile-nav { display: flex; }
+    }
+    .mobile-nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 6px 12px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .mobile-nav-btn .svg-ico { width: 20px; height: 20px; }
+    .mobile-nav-btn.active { color: var(--accent); }
+    .mobile-nav-btn:active { transform: scale(0.92); }
 
     /* ── Cron next-runs timeline ── */
     .next-runs {
@@ -2565,6 +2631,25 @@
         <span class="rail-tooltip">Chat</span>
       </button>
     </nav>
+
+    <!-- Mobile Bottom Nav -->
+    <div class="mobile-nav" id="mobileNav">
+      <button class="mobile-nav-btn active" data-page="dashboard" onclick="showPage('dashboard')">
+        <svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#ico-grid"/></svg>Home
+      </button>
+      <button class="mobile-nav-btn" data-page="tasks" onclick="showPage('tasks')">
+        <svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#ico-check-circle"/></svg>Tasks
+      </button>
+      <button class="mobile-nav-btn" data-page="tracker" onclick="showPage('tracker')">
+        <svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#ico-rss"/></svg>Tracker
+      </button>
+      <button class="mobile-nav-btn" data-page="jobs" onclick="showPage('jobs')">
+        <svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#ico-layers"/></svg>Jobs
+      </button>
+      <button class="mobile-nav-btn" data-page="agents" onclick="showPage('agents')">
+        <svg class="svg-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#ico-cpu"/></svg>Agents
+      </button>
+    </div>
 
     <!-- Topbar -->
     <header class="topbar">
@@ -3130,7 +3215,7 @@
   </div>
 
   <!-- Auth Screen -->
-  <div id="authScreen" style="display:none;position:fixed;inset:0;z-index:5000;background:var(--bg);align-items:center;justify-content:center;">
+  <div id="authScreen" style="display:none;position:fixed;inset:0;z-index:5000;background:var(--bg);align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
     <div style="width:380px;max-width:90vw;">
       <div style="text-align:center;margin-bottom:32px;">
         <div style="width:56px;height:56px;border-radius:16px;background:var(--gradient-accent-chrome);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 4px 28px var(--accent-glow);">
@@ -3361,6 +3446,9 @@
       document.getElementById(`page-${page}`).classList.add('active');
 
       document.querySelectorAll('.rail-btn[data-page]').forEach(b => {
+        b.classList.toggle('active', b.dataset.page === page);
+      });
+      document.querySelectorAll('.mobile-nav-btn[data-page]').forEach(b => {
         b.classList.toggle('active', b.dataset.page === page);
       });
 
