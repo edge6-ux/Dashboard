@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { SvgIcon } from './IconSprite'
 import { AGENTS as AGENTS_CONST, CRON_JOBS as CRON_JOBS_CONST, GATEWAY_URL, HUES, BUILTIN_OUTPUT_ARTIFACTS } from '../lib/constants'
 import { supabase, SUPABASE_URL, SUPABASE_KEY, sbHeaders } from '../lib/supabase'
+import { gordonAvailable } from '../lib/gordon'
 import { loadHue, saveHue, loadLocalJobs, saveLocalJobs, loadTrackers, saveTrackers, loadTrackerArticles, saveTrackerArticles, loadSavedArticles, saveSavedArticles, loadNotifications, saveNotifications, getCancelledJobs, saveCancelledJobs, getDismissedCronJobIds, saveDismissedCronJobIds, getTrash, saveTrash, getDispatchedCatchups, saveDispatchedCatchups } from '../lib/storage'
 import { escapeHtml, getTimeAgo, truncate, fmtDate, isToday, isTomorrow, cronToHuman, cronMatchesDate, cronHour, cronMinute, estimateNextRun, getJobDatesForMonth, to24Hour, animateCounter, getLastScheduledBefore, fmtRunDate } from '../lib/utils'
 
@@ -246,6 +247,11 @@ export default function DashboardApp() {
           const next = { ...prev }
           for (const [id, agent] of Object.entries(next)) {
             const latest = tasks.find(t => t.agent === id)
+            // Gordon connects directly to OpenAI — always online if API key is set
+            if (id === 'gordon') {
+              next[id] = { ...agent, lastActive: latest?.updated_at || agent.lastActive, status: gordonAvailable() ? 'online' : 'offline' }
+              continue
+            }
             if (latest?.updated_at) {
               const minsAgo = (Date.now() - latest.updated_at) / 60000
               next[id] = {
@@ -263,7 +269,11 @@ export default function DashboardApp() {
         setAgents(prev => {
           const next = { ...prev }
           for (const id of Object.keys(next)) {
-            next[id] = { ...next[id], status: gatewayOnline ? 'idle' : 'offline' }
+            if (id === 'gordon') {
+              next[id] = { ...next[id], status: gordonAvailable() ? 'online' : 'offline' }
+            } else {
+              next[id] = { ...next[id], status: gatewayOnline ? 'idle' : 'offline' }
+            }
           }
           return next
         })
