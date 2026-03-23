@@ -241,8 +241,7 @@ export default function DashboardApp() {
     const updateStatus = async () => {
       try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/tasks?select=agent,updated_at&order=updated_at.desc&limit=20`, { headers: sbHeaders })
-        if (!res.ok) return
-        const tasks = await res.json()
+        const tasks = res.ok ? await res.json() : []
         setAgents(prev => {
           const next = { ...prev }
           for (const [id, agent] of Object.entries(next)) {
