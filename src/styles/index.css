@@ -859,6 +859,45 @@ body::before {
 }
 .attach-chip-remove:hover { color: var(--danger); }
 
+/* ── Task Bookmark Button ── */
+.task-bookmark-btn {
+  background: none; border: none; cursor: pointer; padding: 4px; border-radius: 6px;
+  color: var(--muted); flex-shrink: 0; display: flex; align-items: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.task-bookmark-btn:hover { color: var(--accent); background: var(--accent-subtle); }
+.task-bookmark-btn.active { color: var(--accent); }
+
+/* ── Job Cards (new layout) ── */
+.job-card {
+  position: relative; display: flex; margin-bottom: 12px; border-radius: var(--radius-lg);
+  background: linear-gradient(165deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 38%), var(--card);
+  border: 1px solid var(--border); overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.job-card:hover { border-color: rgba(var(--accent-rgb), 0.14); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.job-card-accent { width: 4px; flex-shrink: 0; background: var(--job-color, var(--accent)); }
+.job-card-body { flex: 1; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.job-card-header { display: flex; align-items: flex-start; gap: 14px; }
+.job-card-icon { flex-shrink: 0; }
+.job-card-info { flex: 1; min-width: 0; }
+.job-card-name { font-size: 15px; font-weight: 700; color: var(--text-strong); margin-bottom: 5px; }
+.job-card-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted-fg); align-items: center; }
+.job-card-meta-item { display: flex; align-items: center; gap: 4px; }
+.job-card-meta-dim { opacity: 0.7; }
+.job-card-instructions {
+  font-size: 12px; color: var(--muted-fg); line-height: 1.5;
+  padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;
+  border-left: 2px solid rgba(var(--accent-rgb), 0.2);
+}
+.job-card-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* ── Form helpers ── */
+.form-sublabel { font-size: 11px; font-weight: 600; color: var(--muted-fg); margin-bottom: 6px; }
+.form-notice { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; }
+.form-notice-warn { background: var(--warn-subtle); border: 1px solid rgba(250,204,21,0.2); color: var(--warn); }
+.schedule-preview { padding: 10px 14px; background: var(--accent-subtle); border: 1px solid var(--accent-glow); border-radius: var(--radius); font-size: 13px; color: var(--accent); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+
 /* ── Auth Screen ── */
 .auth-screen {
   position: fixed; inset: 0; z-index: 5000; background: var(--bg);

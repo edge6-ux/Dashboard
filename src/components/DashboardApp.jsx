@@ -18,6 +18,7 @@ import AgentsPage from '../pages/AgentsPage'
 import TrashPage from '../pages/TrashPage'
 import DocumentViewer from '../pages/DocumentViewer'
 import AddJobModal from './modals/AddJobModal'
+import EditJobModal from './modals/EditJobModal'
 import JobDetailModal from './modals/JobDetailModal'
 import EditTaskModal from './modals/EditTaskModal'
 import TrackerModal from './modals/TrackerModal'
@@ -40,6 +41,8 @@ export default function DashboardApp() {
   const [detailModalTask, setDetailModalTask] = useState(null)
   const [editTaskModalOpen, setEditTaskModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
+  const [editJobModalOpen, setEditJobModalOpen] = useState(false)
+  const [editingJob, setEditingJob] = useState(null)
   const [trackerModalOpen, setTrackerModalOpen] = useState(false)
   const [editingTrackerId, setEditingTrackerId] = useState(null)
 
@@ -92,7 +95,8 @@ export default function DashboardApp() {
           id: r.id, name: r.name, agent: r.agent, status: r.status, type: r.type,
           description: r.description, createdAt: r.created_at, updatedAt: r.updated_at,
           completedAt: r.completed_at, color: r.color, schedule: r.schedule, error: r.error,
-          links: r.links || [], documents: r.documents || [], attachments: r.attachments || [], progress: r.progress, fromDB: true
+          links: r.links || [], documents: r.documents || [], attachments: r.attachments || [],
+          progress: r.progress, bookmarked: r.bookmarked || false, fromDB: true
         }))
       }
     } catch (e) { console.warn('Supabase fetch failed:', e) }
@@ -118,9 +122,22 @@ export default function DashboardApp() {
     const remaining = trashItems.filter(t => t.deletedAt > cutoff)
     if (remaining.length !== trashItems.length) saveTrash(remaining)
 
-    // Load tasks
-    loadTasksFromDB().then(tasks => {
-      if (tasks) setDbTasks(tasks)
+    // Load tasks, then purge any completed/error tasks older than 30 days (unless bookmarked)
+    loadTasksFromDB().then(async tasks => {
+      if (!tasks) return
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const toDelete = tasks.filter(t =>
+        !t.bookmarked && ['completed', 'error'].includes(t.status) && (t.createdAt || 0) < cutoff
+      )
+      if (toDelete.length > 0) {
+        await Promise.all(toDelete.map(t =>
+          fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${encodeURIComponent(t.id)}`, { method: 'DELETE', headers: sbHeaders })
+            .catch(() => {})
+        ))
+        setDbTasks(tasks.filter(t => !toDelete.some(d => d.id === t.id)))
+      } else {
+        setDbTasks(tasks)
+      }
     })
 
     // Sync trackers from Supabase — Supabase is authoritative
@@ -363,6 +380,7 @@ export default function DashboardApp() {
     if ('completedAt' in updates) snaked.completed_at = updates.completedAt
     if ('error' in updates) snaked.error = updates.error
     if ('attachments' in updates) snaked.attachments = updates.attachments
+    if ('bookmarked' in updates) snaked.bookmarked = updates.bookmarked
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH', headers: sbHeaders, body: JSON.stringify(snaked)
@@ -407,14 +425,15 @@ export default function DashboardApp() {
     addModalOpen, setAddModalOpen,
     detailModalOpen, setDetailModalOpen, detailModalJob, setDetailModalJob,
     detailModalTask, setDetailModalTask,
+    editJobModalOpen, setEditJobModalOpen, editingJob, setEditingJob,
     editTaskModalOpen, setEditTaskModalOpen, editingTask, setEditingTask,
     trackerModalOpen, setTrackerModalOpen, editingTrackerId, setEditingTrackerId,
     outputArtifacts
   }
 
   const pageLabels = {
-    dashboard: '/ Dashboard', calendar: '/ Calendar', jobs: '/ Jobs & Tasks',
-    tasks: '/ Task Tracker', agents: '/ Agents', tracker: '/ Tracker',
+    dashboard: '/ Dashboard', calendar: '/ Calendar', jobs: '/ Jobs',
+    tasks: '/ Task History', agents: '/ Agents', tracker: '/ Tracker',
     trash: '/ Trash', document: '/ Document'
   }
 
@@ -449,6 +468,7 @@ export default function DashboardApp() {
 
       {/* Modals */}
       {addModalOpen && <AddJobModal ctx={ctx} />}
+      {editJobModalOpen && <EditJobModal ctx={ctx} />}
       {detailModalOpen && <JobDetailModal ctx={ctx} />}
       {editTaskModalOpen && <EditTaskModal ctx={ctx} />}
       {trackerModalOpen && <TrackerModal ctx={ctx} />}

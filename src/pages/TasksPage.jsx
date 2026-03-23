@@ -1,63 +1,42 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { SvgIcon } from '../components/IconSprite'
-import { getTimeAgo, truncate, cronToHuman } from '../lib/utils'
-import { getDismissedCronJobIds, saveDismissedCronJobIds, getTrash, saveTrash } from '../lib/storage'
-import { SUPABASE_URL, sbHeaders } from '../lib/supabase'
+import { getTimeAgo, truncate } from '../lib/utils'
+import { getTrash, saveTrash } from '../lib/storage'
 
 export default function TasksPage({ ctx }) {
-  const { agents, getAllTasks, mergeTaskDocuments, dbTasks, setDbTasks, dbUpdateTask, dbDeleteTask, dbInsertTask, postJobQueue, loadTasksFromDB, getAllJobs, toast, showPage, setAddModalOpen, setEditTaskModalOpen, setEditingTask, setDetailModalOpen, setDetailModalJob, viewDocument } = ctx
+  const { agents, dbTasks, setDbTasks, dbUpdateTask, dbDeleteTask, mergeTaskDocuments, toast, setDetailModalTask, setDetailModalOpen, viewDocument } = ctx
   const [filter, setFilter] = useState('all')
 
-  const allTasks = getAllTasks()
-  const filtered = filter === 'all' ? allTasks : allTasks.filter(t => t.status === filter)
+  // Tasks page shows DB tasks only (real runs, not synthetic cron stubs)
+  const allTasks = [...dbTasks].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+
+  const filtered = filter === 'all' ? allTasks
+    : filter === 'bookmarked' ? allTasks.filter(t => t.bookmarked)
+    : allTasks.filter(t => t.status === filter)
 
   const counts = {
     all: allTasks.length,
-    queued: allTasks.filter(t => t.status === 'queued').length,
-    running: allTasks.filter(t => t.status === 'running').length,
+    bookmarked: allTasks.filter(t => t.bookmarked).length,
     completed: allTasks.filter(t => t.status === 'completed').length,
+    running: allTasks.filter(t => t.status === 'running' || t.status === 'queued').length,
     error: allTasks.filter(t => t.status === 'error').length,
   }
 
-  // Sort: running first, then queued, then errors, then completed
-  const statusOrder = { running: 0, queued: 1, error: 2, completed: 3 }
-  const sorted = [...filtered].sort((a, b) => {
-    const diff = (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4)
-    if (diff !== 0) return diff
-    return (b.updatedAt || 0) - (a.updatedAt || 0)
-  })
-
-  const updateTaskStatus = async (id, newStatus) => {
-    const updates = { status: newStatus, updatedAt: Date.now() }
-    if (newStatus === 'completed') { updates.completedAt = Date.now(); updates.progress = 100 }
-    if (newStatus === 'queued') { updates.completedAt = null }
-    if (newStatus === 'error') { updates.progress = 25 }
-    if (newStatus === 'running') { updates.progress = 50 }
-
-    setDbTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
-    toast(`Task updated`, 'success')
-    await dbUpdateTask(id, updates)
-    const tasks = await loadTasksFromDB()
-    if (tasks) setDbTasks(tasks)
+  const toggleBookmark = async (e, task) => {
+    e.stopPropagation()
+    const bookmarked = !task.bookmarked
+    setDbTasks(prev => prev.map(t => t.id === task.id ? { ...t, bookmarked } : t))
+    await dbUpdateTask(task.id, { bookmarked })
+    toast(bookmarked ? 'Task bookmarked' : 'Bookmark removed', 'success')
   }
 
-  const deleteTaskWithTrash = async (id) => {
-    if (id.startsWith('cron-')) {
-      const jobId = id.replace(/^cron-/, '')
-      const ids = getDismissedCronJobIds()
-      ids.push(jobId)
-      saveDismissedCronJobIds(ids)
-      toast('Removed from tracker', 'success')
-      return
-    }
-    const task = dbTasks.find(t => t.id === id)
-    if (task) {
-      const trash = getTrash()
-      trash.push({ ...task, _trashType: 'task', deletedAt: Date.now() })
-      saveTrash(trash)
-      setDbTasks(prev => prev.filter(t => t.id !== id))
-      await dbDeleteTask(id)
-    }
+  const deleteTask = async (e, task) => {
+    e.stopPropagation()
+    const trash = getTrash()
+    trash.push({ ...task, _trashType: 'task', deletedAt: Date.now() })
+    saveTrash(trash)
+    setDbTasks(prev => prev.filter(t => t.id !== task.id))
+    await dbDeleteTask(task.id)
     toast('Task moved to trash', 'success')
   }
 
@@ -69,23 +48,22 @@ export default function TasksPage({ ctx }) {
     <div className="page active" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div className="section-header anim anim-1">
         <div>
-          <div className="section-title"><span className="title-ico"><SvgIcon id="ico-check-circle" size={22} /></span>Task Tracker</div>
-          <div className="section-sub">Monitor task progress and review completed work</div>
+          <div className="section-title"><span className="title-ico"><SvgIcon id="ico-clipboard" size={22} /></span>Task History</div>
+          <div className="section-sub">Completed runs — kept 30 days unless bookmarked</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setAddModalOpen(true)}><SvgIcon id="ico-plus-circle" size={16} /> New Task</button>
       </div>
 
       {/* Filter tabs */}
       <div className="anim anim-2" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {[
-          { key: 'all', label: 'All Tasks', icon: null },
-          { key: 'queued', label: 'Queued', icon: 'ico-clock' },
-          { key: 'running', label: 'In Progress', icon: 'ico-refresh' },
+          { key: 'all', label: 'All', icon: null },
+          { key: 'bookmarked', label: 'Bookmarked', icon: 'ico-bookmark-fill' },
           { key: 'completed', label: 'Completed', icon: 'ico-check-circle' },
-          { key: 'error', label: 'Stuck / Error', icon: 'ico-alert' },
+          { key: 'running', label: 'Active', icon: 'ico-refresh' },
+          { key: 'error', label: 'Errors', icon: 'ico-alert' },
         ].map(f => (
           <button key={f.key} className={`task-filter-btn ${filter === f.key ? 'active' : ''}`} onClick={() => setFilter(f.key)}>
-            {f.icon && <SvgIcon id={f.icon} size={15} />}
+            {f.icon && <SvgIcon id={f.icon} size={14} />}
             {f.label} <span className="task-count">{counts[f.key]}</span>
           </button>
         ))}
@@ -93,14 +71,18 @@ export default function TasksPage({ ctx }) {
 
       {/* Task list */}
       <div className="anim anim-3">
-        {sorted.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="card" style={{ marginTop: 8 }}>
             <div className="empty-state">
-              <div className="empty-icon"><SvgIcon id={filter === 'completed' ? 'ico-party' : filter === 'error' ? 'ico-alert' : 'ico-clipboard'} size={32} /></div>
-              <div className="empty-text">{filter === 'all' ? 'No tasks yet — create one!' : filter === 'completed' ? 'No completed tasks yet' : filter === 'error' ? 'No stuck tasks — everything is running smooth!' : `No ${filter} tasks`}</div>
+              <div className="empty-icon">
+                <SvgIcon id={filter === 'bookmarked' ? 'ico-bookmark' : filter === 'completed' ? 'ico-party' : filter === 'error' ? 'ico-alert' : 'ico-clipboard'} size={32} />
+              </div>
+              <div className="empty-text">
+                {filter === 'all' ? 'No task history yet' : filter === 'bookmarked' ? 'No bookmarked tasks' : filter === 'completed' ? 'No completed tasks yet' : filter === 'error' ? 'No errors — all good!' : 'No active tasks'}
+              </div>
             </div>
           </div>
-        ) : sorted.map(t => {
+        ) : filtered.map(t => {
           const agent = agents[t.agent] || { name: 'Unknown', initial: '?', color: '#666' }
           const timeAgo = t.updatedAt ? getTimeAgo(t.updatedAt) : ''
           const completedStr = t.completedAt ? new Date(t.completedAt).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' }) : ''
@@ -109,19 +91,19 @@ export default function TasksPage({ ctx }) {
           const taskAttachments = t.attachments || []
 
           return (
-            <div key={t.id} className="task-card" style={{ '--task-color': t.color || agent.color }} onClick={() => { ctx.setDetailModalTask(t); ctx.setDetailModalOpen(true) }}>
+            <div key={t.id} className="task-card" style={{ '--task-color': t.color || agent.color }}
+              onClick={() => { setDetailModalTask(t); setDetailModalOpen(true) }}>
               <div className="task-card-header">
                 <div className={`task-status-icon ${t.status}`}><SvgIcon id={statusIcons[t.status]} size={20} /></div>
                 <div className="task-main">
                   <div className="task-title">{t.name}</div>
                   <div className="task-meta">
                     <span className="task-meta-item"><span className="agent-emblem-mini">{agent.initial}</span><span>{agent.name}</span></span>
-                    <span className="task-meta-item"><SvgIcon id="ico-clipboard" size={14} /><span>{t.type === 'recurring' ? 'Recurring' : 'One-time'}</span></span>
-                    {t.schedule && <span className="task-meta-item"><SvgIcon id="ico-clock" size={14} /><span>{t.schedule}</span></span>}
                     {taskAttachments.length > 0 && <span className="task-meta-item"><SvgIcon id="ico-paperclip" size={14} /><span>{taskAttachments.length} attachment{taskAttachments.length > 1 ? 's' : ''}</span></span>}
+                    {completedStr && <span className="task-meta-item task-meta-dim"><SvgIcon id="ico-check-circle" size={13} />{completedStr}</span>}
                     {timeAgo && <span className="task-time-ago">{timeAgo}</span>}
                   </div>
-                  {t.description && <div className="task-description">{truncate(t.description, 150)}</div>}
+                  {t.description && <div className="task-description">{truncate(t.description, 120)}</div>}
                   {(links.length > 0 || docs.length > 0 || taskAttachments.length > 0) && (
                     <div className="task-attachments">
                       {links.map((l, i) => <a key={i} className="task-attachment" href={l.url} target="_blank" onClick={e => e.stopPropagation()}><SvgIcon id="ico-link" size={13} /><span>{l.label || l.url}</span></a>)}
@@ -146,15 +128,18 @@ export default function TasksPage({ ctx }) {
                     </div>
                   )}
                 </div>
-                <div className={`task-status-badge ${t.status}`}>{statusLabels[t.status]}</div>
+                <button
+                  className={`task-bookmark-btn ${t.bookmarked ? 'active' : ''}`}
+                  onClick={e => toggleBookmark(e, t)}
+                  title={t.bookmarked ? 'Remove bookmark' : 'Bookmark task'}
+                >
+                  <SvgIcon id={t.bookmarked ? 'ico-bookmark-fill' : 'ico-bookmark'} size={16} />
+                </button>
               </div>
               <div className="task-actions" onClick={e => e.stopPropagation()}>
-                {t.status === 'running' && <button className="btn btn-sm" onClick={() => updateTaskStatus(t.id, 'queued')}><SvgIcon id="ico-pause" size={14} /> Pause</button>}
-                {t.status !== 'running' && t.status !== 'completed' && <button className="btn btn-sm" onClick={() => updateTaskStatus(t.id, 'running')}><SvgIcon id="ico-play" size={14} /> Start</button>}
-                {!t.id.startsWith('cron-') && t.status !== 'running' && (
-                  <button className="btn btn-sm" onClick={() => { setEditingTask(t); setEditTaskModalOpen(true) }}><SvgIcon id="ico-pencil" size={14} /> Edit</button>
-                )}
-                <button className="btn btn-sm btn-danger" style={{ marginLeft: 'auto' }} onClick={() => deleteTaskWithTrash(t.id)}>Delete</button>
+                <button className="btn btn-sm btn-danger" style={{ marginLeft: 'auto' }} onClick={e => deleteTask(e, t)}>
+                  <SvgIcon id="ico-trash" size={14} /> Delete
+                </button>
               </div>
             </div>
           )
