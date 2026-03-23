@@ -132,6 +132,32 @@ export function estimateNextRun(cron, tz) {
   return null
 }
 
+// Returns the timestamp of the most recent past occurrence of a cron schedule
+// within the given lookback window (default 3 hours). Returns null if none found.
+export function getLastScheduledBefore(cron, beforeMs = Date.now(), windowMs = 3 * 60 * 60 * 1000) {
+  const h = cronHour(cron)
+  const m = cronMinute(cron)
+  if (h < 0 || m < 0) return null
+  const cutoff = beforeMs - windowMs
+
+  for (let i = 0; i <= 7; i++) {
+    const check = new Date(beforeMs)
+    check.setDate(check.getDate() - i)
+    check.setHours(h, m, 0, 0)
+    const t = check.getTime()
+    if (!cronMatchesDate(cron, check)) continue
+    if (t >= beforeMs) continue        // still in the future for this day
+    if (t < cutoff) return null        // outside window, won't find anything newer by going further back
+    return t
+  }
+  return null
+}
+
+// Format a timestamp as MM/DD/YY (e.g. "03/23/26")
+export function fmtRunDate(ts) {
+  return new Date(ts).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
+}
+
 export function getJobDatesForMonth(year, month, jobs, agents) {
   const dates = {}
   const daysInMonth = new Date(year, month + 1, 0).getDate()

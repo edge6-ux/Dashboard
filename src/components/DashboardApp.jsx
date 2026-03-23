@@ -3,8 +3,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { SvgIcon } from './IconSprite'
 import { AGENTS as AGENTS_CONST, CRON_JOBS as CRON_JOBS_CONST, GATEWAY_URL, HUES, BUILTIN_OUTPUT_ARTIFACTS } from '../lib/constants'
 import { supabase, SUPABASE_URL, SUPABASE_KEY, sbHeaders } from '../lib/supabase'
-import { loadHue, saveHue, loadLocalJobs, saveLocalJobs, loadTrackers, saveTrackers, loadTrackerArticles, saveTrackerArticles, loadSavedArticles, saveSavedArticles, loadNotifications, saveNotifications, getCancelledJobs, saveCancelledJobs, getDismissedCronJobIds, saveDismissedCronJobIds, getTrash, saveTrash } from '../lib/storage'
-import { escapeHtml, getTimeAgo, truncate, fmtDate, isToday, isTomorrow, cronToHuman, cronMatchesDate, cronHour, cronMinute, estimateNextRun, getJobDatesForMonth, to24Hour, animateCounter } from '../lib/utils'
+import { loadHue, saveHue, loadLocalJobs, saveLocalJobs, loadTrackers, saveTrackers, loadTrackerArticles, saveTrackerArticles, loadSavedArticles, saveSavedArticles, loadNotifications, saveNotifications, getCancelledJobs, saveCancelledJobs, getDismissedCronJobIds, saveDismissedCronJobIds, getTrash, saveTrash, getDispatchedCatchups, saveDispatchedCatchups } from '../lib/storage'
+import { escapeHtml, getTimeAgo, truncate, fmtDate, isToday, isTomorrow, cronToHuman, cronMatchesDate, cronHour, cronMinute, estimateNextRun, getJobDatesForMonth, to24Hour, animateCounter, getLastScheduledBefore, fmtRunDate } from '../lib/utils'
 
 import Sidebar from './Sidebar'
 import MobileNav from './MobileNav'
@@ -92,7 +92,7 @@ export default function DashboardApp() {
           id: r.id, name: r.name, agent: r.agent, status: r.status, type: r.type,
           description: r.description, createdAt: r.created_at, updatedAt: r.updated_at,
           completedAt: r.completed_at, color: r.color, schedule: r.schedule, error: r.error,
-          links: r.links || [], documents: r.documents || [], progress: r.progress, fromDB: true
+          links: r.links || [], documents: r.documents || [], attachments: r.attachments || [], progress: r.progress, fromDB: true
         }))
       }
     } catch (e) { console.warn('Supabase fetch failed:', e) }
@@ -123,24 +123,19 @@ export default function DashboardApp() {
       if (tasks) setDbTasks(tasks)
     })
 
-    // Sync trackers from Supabase
+    // Sync trackers from Supabase — Supabase is authoritative
     if (user?.id) {
       supabase.from('trackers').select('*').eq('user_id', user.id).then(({ data, error }) => {
         if (error || !data) return
+        const remoteIds = new Set(data.map(r => r.id))
         const local = loadTrackers()
-        const localIds = new Set(local.map(t => t.id))
-        let merged = [...local]
-        for (const row of data) {
-          if (!localIds.has(row.id)) {
-            merged.push({ id: row.id, name: row.name, keywords: row.keywords || [], color: row.color || '#b9a9ff', createdAt: row.created_at, updatedAt: row.updated_at, lastFetched: row.last_fetched })
-          } else {
-            const localT = merged.find(t => t.id === row.id)
-            if (localT && row.updated_at > (localT.updatedAt || 0)) {
-              Object.assign(localT, { name: row.name, keywords: row.keywords || localT.keywords, color: row.color || localT.color, updatedAt: row.updated_at, lastFetched: row.last_fetched || localT.lastFetched })
-            }
-          }
-        }
-        saveTrackers(merged)
+        const localOnly = local.filter(t => !remoteIds.has(t.id))
+        const remote = data.map(row => ({
+          id: row.id, name: row.name, keywords: row.keywords || [],
+          color: row.color || '#b9a9ff', createdAt: row.created_at,
+          updatedAt: row.updated_at, lastFetched: row.last_fetched
+        }))
+        saveTrackers([...remote, ...localOnly])
       })
     }
 
@@ -185,6 +180,43 @@ export default function DashboardApp() {
     const interval = setInterval(check, 15000)
     return () => clearInterval(interval)
   }, [addNotification])
+
+  // Catchup: when gateway comes online, dispatch any recurring jobs missed within the last 3 hours
+  useEffect(() => {
+    if (!gatewayOnline) return
+
+    const now = Date.now()
+    const dispatched = getDispatchedCatchups()
+    const missed = []
+
+    for (const job of cronJobs) {
+      if (!job.enabled || !job.cron || job._deleted) continue
+      const lastScheduled = getLastScheduledBefore(job.cron, now, 3 * 60 * 60 * 1000)
+      if (!lastScheduled) continue
+      if (lastScheduled <= (job.lastRun || 0)) continue  // already ran on schedule
+
+      const dateStr = fmtRunDate(lastScheduled)
+      const alreadyDispatched = dispatched.some(d => d.jobId === job.id && d.dateStr === dateStr)
+      if (alreadyDispatched) continue
+
+      missed.push({ job, lastScheduled, dateStr })
+    }
+
+    if (missed.length === 0) return
+
+    ;(async () => {
+      for (const { job, lastScheduled, dateStr } of missed) {
+        const datedName = `${job.name} ${dateStr}`
+        const taskId = 'catchup-' + Date.now().toString(36) + '-' + job.id.slice(0, 8)
+        await postJobQueue(taskId, job.agent, datedName, job.message)
+        dispatched.push({ jobId: job.id, dateStr, ts: now })
+      }
+      saveDispatchedCatchups(dispatched)
+      const label = missed.map(m => m.job.name).join(', ')
+      toast(`Dispatched ${missed.length} missed job${missed.length > 1 ? 's' : ''}: ${label}`, 'success')
+      addNotification('info', 'Catchup Jobs Queued', `${missed.length} job${missed.length > 1 ? 's' : ''} missed while gateway was offline: ${label}`)
+    })()
+  }, [gatewayOnline]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update agent status based on task activity
   useEffect(() => {
@@ -278,11 +310,16 @@ export default function DashboardApp() {
   const getAllTasks = useCallback(() => {
     const dismissedCron = new Set(getDismissedCronJobIds())
     const allJobs = getAllJobs()
+    const todayStr = fmtRunDate(Date.now())
     const cronTasks = allJobs
       .filter(j => {
         if (j.isLocal) return false
         if (dismissedCron.has(j.id)) return false
-        return !dbTasks.some(t => t.name === j.name && t.agent === j.agent)
+        // Suppress synthetic task if there's already a DB task for this job today
+        // (matched by exact name OR dated variant "Job Name MM/DD/YY")
+        return !dbTasks.some(t => t.agent === j.agent && (
+          t.name === j.name || t.name === `${j.name} ${todayStr}`
+        ))
       })
       .map(j => {
         const agent = agents[j.agent] || { name: 'Unknown', initial: '?', color: '#666' }
@@ -312,7 +349,7 @@ export default function DashboardApp() {
           type: task.type, description: task.description, created_at: task.createdAt,
           updated_at: task.updatedAt, completed_at: task.completedAt, color: task.color,
           schedule: task.schedule || '', error: task.error, links: task.links || [],
-          documents: task.documents || [], progress: task.progress || 0
+          documents: task.documents || [], attachments: task.attachments || [], progress: task.progress || 0
         })
       })
     } catch (e) { console.warn('Supabase insert failed:', e) }
@@ -325,6 +362,7 @@ export default function DashboardApp() {
     if ('updatedAt' in updates) snaked.updated_at = updates.updatedAt
     if ('completedAt' in updates) snaked.completed_at = updates.completedAt
     if ('error' in updates) snaked.error = updates.error
+    if ('attachments' in updates) snaked.attachments = updates.attachments
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH', headers: sbHeaders, body: JSON.stringify(snaked)
@@ -419,7 +457,8 @@ export default function DashboardApp() {
       <div className="toast-container">
         {toasts.map(t => (
           <div key={t.id} className={`toast ${t.type}`}>
-            {t.type === 'success' ? '✅' : '⚠️'} {t.msg}
+            <SvgIcon id={t.type === 'success' ? 'ico-check-circle' : t.type === 'error' ? 'ico-alert' : 'ico-bolt'} size={16} />
+            {t.msg}
           </div>
         ))}
       </div>

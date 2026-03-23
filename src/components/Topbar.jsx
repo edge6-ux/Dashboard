@@ -7,7 +7,9 @@ import { saveNotifications } from '../lib/storage'
 export default function Topbar({ breadcrumb, showPage, hue, changeHue, gatewayOnline, notifications, setNotifications, user, signOut }) {
   const [clock, setClock] = useState('')
   const [notifOpen, setNotifOpen] = useState(false)
+  const [signOutPending, setSignOutPending] = useState(false)
   const notifRef = useRef(null)
+  const signOutRef = useRef(null)
 
   // Clock
   useEffect(() => {
@@ -20,12 +22,11 @@ export default function Topbar({ breadcrumb, showPage, hue, changeHue, gatewayOn
     return () => clearInterval(interval)
   }, [])
 
-  // Close notif panel on outside click
+  // Close panels on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setNotifOpen(false)
-      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false)
+      if (signOutRef.current && !signOutRef.current.contains(e.target)) setSignOutPending(false)
     }
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
@@ -76,18 +77,7 @@ export default function Topbar({ breadcrumb, showPage, hue, changeHue, gatewayOn
         </div>
         <div className="topbar-clock">{clock}</div>
         <div className={`topbar-status ${gatewayClass}`}>
-          <div
-            className="topbar-dot"
-            style={gatewayOnline === false ? {
-              background: 'var(--danger)',
-              boxShadow: '0 0 8px var(--danger)',
-              animation: 'none'
-            } : gatewayOnline === null ? {
-              background: 'var(--warn)',
-              boxShadow: '0 0 8px var(--warn)',
-              animation: 'none'
-            } : {}}
-          />
+          <div className="topbar-dot" />
           <span>{gatewayLabel}</span>
         </div>
 
@@ -130,14 +120,20 @@ export default function Topbar({ breadcrumb, showPage, hue, changeHue, gatewayOn
           </div>
         </div>
 
-        <div
-          className="topbar-avatar"
-          title={user?.email || ''}
-          onClick={() => {
-            if (window.confirm('Sign out of ' + (user?.email || 'your account') + '?')) signOut()
-          }}
-        >
-          {initial}
+        <div className="topbar-avatar-wrap" ref={signOutRef}>
+          <div
+            className="topbar-avatar"
+            title={user?.email || ''}
+            onClick={() => setSignOutPending(p => !p)}
+          >
+            {initial}
+          </div>
+          {signOutPending && (
+            <div className="signout-popover">
+              <div className="signout-email">{user?.email}</div>
+              <button className="btn btn-sm btn-danger" onClick={() => { signOut(); setSignOutPending(false) }}>Sign out</button>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -85,6 +85,16 @@ export function saveTrash(items) {
   localStorage.setItem(userKey('mc-trash'), JSON.stringify(items))
 }
 
+// Catchup dispatch tracking — prevents double-dispatching missed jobs after page refresh
+export function getDispatchedCatchups() {
+  try { return JSON.parse(localStorage.getItem(userKey('mc-catchups')) || '[]') } catch { return [] }
+}
+export function saveDispatchedCatchups(list) {
+  // Prune entries older than 7 days
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  localStorage.setItem(userKey('mc-catchups'), JSON.stringify(list.filter(c => c.ts > cutoff)))
+}
+
 // Theme hue
 export function loadHue() {
   const key = 'mc-ui-hue'

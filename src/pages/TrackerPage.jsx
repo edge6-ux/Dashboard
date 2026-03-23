@@ -15,36 +15,23 @@ export default function TrackerPage({ ctx }) {
   const [, forceUpdate] = useState(0)
   const refresh = () => forceUpdate(n => n + 1)
 
-  // Sync trackers from Supabase on mount
+  // Sync trackers from Supabase on mount — Supabase is authoritative
   useEffect(() => {
     if (!user?.id || synced) return
-    (async () => {
+    ;(async () => {
       try {
         const { data, error } = await supabase.from('trackers').select('*').eq('user_id', user.id)
         if (error || !data) return
+        const remoteIds = new Set(data.map(r => r.id))
         const local = loadTrackers()
-        const localIds = new Set(local.map(t => t.id))
-        let merged = [...local]
-        for (const row of data) {
-          if (!localIds.has(row.id)) {
-            merged.push({
-              id: row.id, name: row.name, keywords: row.keywords || [],
-              color: row.color || '#b9a9ff', createdAt: row.created_at,
-              updatedAt: row.updated_at, lastFetched: row.last_fetched
-            })
-          } else {
-            // Update local with server data if server is newer
-            const localT = merged.find(t => t.id === row.id)
-            if (localT && row.updated_at > (localT.updatedAt || 0)) {
-              localT.name = row.name
-              localT.keywords = row.keywords || localT.keywords
-              localT.color = row.color || localT.color
-              localT.updatedAt = row.updated_at
-              localT.lastFetched = row.last_fetched || localT.lastFetched
-            }
-          }
-        }
-        saveTrackers(merged)
+        // Keep locally-created trackers not yet in Supabase (insert may have failed)
+        const localOnly = local.filter(t => !remoteIds.has(t.id))
+        const remote = data.map(row => ({
+          id: row.id, name: row.name, keywords: row.keywords || [],
+          color: row.color || '#b9a9ff', createdAt: row.created_at,
+          updatedAt: row.updated_at, lastFetched: row.last_fetched
+        }))
+        saveTrackers([...remote, ...localOnly])
         setSynced(true)
         refresh()
       } catch (e) { console.warn('Tracker sync from Supabase failed:', e) }
@@ -147,13 +134,14 @@ export default function TrackerPage({ ctx }) {
     refresh()
   }
 
-  const deleteTracker = (id) => {
+  const deleteTracker = async (id) => {
     const updated = loadTrackers().filter(t => t.id !== id)
     saveTrackers(updated)
     const arts = loadTrackerArticles()
     delete arts[id]
     saveTrackerArticles(arts)
     if (activeTrackerId === id) setActiveTrackerId(updated[0]?.id || null)
+    try { await supabase.from('trackers').delete().eq('id', id) } catch (e) { console.warn('Tracker delete from Supabase failed:', e) }
     toast('Tracker deleted', 'success')
     refresh()
   }

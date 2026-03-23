@@ -207,7 +207,7 @@ body::before {
 }
 
 .rail-tooltip {
-  position: absolute; left: 56px; background: var(--bg-elevated);
+  position: absolute; left: calc(100% + 8px); background: var(--bg-elevated);
   border: 1px solid var(--border-strong); color: var(--text-strong);
   font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
   white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; z-index: 100;
@@ -271,6 +271,8 @@ body::before {
   0%, 100% { box-shadow: 0 0 4px var(--ok); opacity: 0.8; }
   50% { box-shadow: 0 0 16px var(--ok), 0 0 32px rgba(74, 222, 128, 0.2); opacity: 1; }
 }
+.topbar-status.offline .topbar-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); animation: none; }
+.topbar-status.checking .topbar-dot { background: var(--warn); box-shadow: 0 0 8px var(--warn); animation: none; }
 
 .topbar-avatar {
   width: 32px; height: 32px; border-radius: 50%;
@@ -281,6 +283,16 @@ body::before {
   font-size: 14px; cursor: pointer; transition: box-shadow 0.2s ease;
 }
 .topbar-avatar:hover { box-shadow: 0 0 32px rgba(var(--accent-rgb), 0.35), 0 0 64px rgba(var(--accent-rgb), 0.15); }
+
+.topbar-avatar-wrap { position: relative; }
+.signout-popover {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+  padding: 12px 16px; min-width: 196px; box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 10px; z-index: 200;
+  animation: slideModal 0.2s ease;
+}
+.signout-email { font-size: 12px; color: var(--muted-fg); word-break: break-all; font-family: var(--mono); }
 
 /* ── Notification Center ── */
 .notif-wrapper { position: relative; }
@@ -493,6 +505,18 @@ body::before {
   background: rgba(255, 255, 255, 0.06); display: inline-flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-weight: 700; color: var(--text-strong);
 }
+
+/* ── Agent Cards (Full Page View) ── */
+.agent-card { --agent-color: var(--accent); border-left: 3px solid var(--agent-color); }
+.agent-card-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.agent-avatar-lg {
+  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 1.2rem; font-weight: 700;
+}
+.agent-card-footer { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.agent-model-tag { background: var(--bg-hover); padding: 4px 10px; border-radius: var(--radius-full); font-size: 12px; color: var(--text); }
+.agent-last-active { font-size: 11px; color: var(--muted-fg); font-family: var(--mono); }
 
 /* ── Add Task Button ── */
 .add-task-btn {
@@ -789,7 +813,9 @@ body::before {
 .toast-container { position: fixed; top: 16px; right: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
 .toast { padding: 12px 20px; background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); color: var(--text-strong); font-size: 13px; font-weight: 500; box-shadow: var(--shadow-lg); animation: toastIn 0.3s ease; display: flex; align-items: center; gap: 10px; }
 .toast.success { border-color: #34d39940; }
+.toast.success .svg-ico { color: var(--ok); }
 .toast.error { border-color: #f43f5e40; }
+.toast.error .svg-ico { color: var(--danger); }
 @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
 /* ── Empty State ── */
@@ -805,6 +831,33 @@ body::before {
 .anim-2 { animation-delay: 0.1s; }
 .anim-3 { animation-delay: 0.15s; }
 .anim-4 { animation-delay: 0.2s; }
+
+/* ── Attachment Uploader ── */
+.attach-zone {
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px;
+  padding: 20px 16px; border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg);
+  background: var(--bg); color: var(--muted-fg); font-size: 13px; cursor: pointer;
+  transition: all 0.15s ease; text-align: center;
+}
+.attach-zone:hover, .attach-zone.drag-over { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
+.attach-zone.uploading { pointer-events: none; opacity: 0.7; flex-direction: row; gap: 8px; }
+.attach-zone-hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.attach-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.attach-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
+  border-radius: var(--radius); border: 1px solid var(--border); font-size: 11px; font-weight: 600;
+  background: var(--bg-elevated); color: var(--text); max-width: 240px;
+}
+.attach-chip.pdf { border-color: rgba(251, 113, 133, 0.25); color: var(--danger); }
+.attach-chip.img { border-color: rgba(var(--accent-rgb), 0.25); color: var(--accent); }
+.attach-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.attach-chip-size { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+.attach-chip-remove {
+  background: none; border: none; cursor: pointer; color: var(--muted); padding: 2px;
+  display: flex; align-items: center; flex-shrink: 0; transition: color 0.12s ease;
+}
+.attach-chip-remove:hover { color: var(--danger); }
 
 /* ── Auth Screen ── */
 .auth-screen {

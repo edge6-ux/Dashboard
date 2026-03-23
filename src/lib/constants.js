@@ -4,7 +4,7 @@
 
 export const AGENTS = {
   christopher: { name: 'Christopher', initial: 'C', model: 'Claude Opus 4', color: '#b9a9ff', role: 'Primary AI Companion' },
-  gordon: { name: 'Gordon', initial: 'G', model: 'GPT-5 Mini', color: '#06b6d4', role: 'Quick-Draw Sidekick' }
+  gordon: { name: 'Gordon', initial: 'G', model: 'GPT-4.1', color: '#06b6d4', role: 'Primary Agent' }
 }
 
 export const CRON_JOBS = [

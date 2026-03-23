@@ -106,6 +106,7 @@ export default function TasksPage({ ctx }) {
           const completedStr = t.completedAt ? new Date(t.completedAt).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' }) : ''
           const docs = mergeTaskDocuments(t)
           const links = t.links || []
+          const taskAttachments = t.attachments || []
 
           return (
             <div key={t.id} className="task-card" style={{ '--task-color': t.color || agent.color }} onClick={() => { ctx.setDetailModalTask(t); ctx.setDetailModalOpen(true) }}>
@@ -117,13 +118,20 @@ export default function TasksPage({ ctx }) {
                     <span className="task-meta-item"><span className="agent-emblem-mini">{agent.initial}</span><span>{agent.name}</span></span>
                     <span className="task-meta-item"><SvgIcon id="ico-clipboard" size={14} /><span>{t.type === 'recurring' ? 'Recurring' : 'One-time'}</span></span>
                     {t.schedule && <span className="task-meta-item"><SvgIcon id="ico-clock" size={14} /><span>{t.schedule}</span></span>}
+                    {taskAttachments.length > 0 && <span className="task-meta-item"><SvgIcon id="ico-paperclip" size={14} /><span>{taskAttachments.length} attachment{taskAttachments.length > 1 ? 's' : ''}</span></span>}
                     {timeAgo && <span className="task-time-ago">{timeAgo}</span>}
                   </div>
                   {t.description && <div className="task-description">{truncate(t.description, 150)}</div>}
-                  {(links.length > 0 || docs.length > 0) && (
+                  {(links.length > 0 || docs.length > 0 || taskAttachments.length > 0) && (
                     <div className="task-attachments">
                       {links.map((l, i) => <a key={i} className="task-attachment" href={l.url} target="_blank" onClick={e => e.stopPropagation()}><SvgIcon id="ico-link" size={13} /><span>{l.label || l.url}</span></a>)}
                       {docs.map((d, i) => <button key={i} type="button" className="task-attachment" onClick={e => { e.stopPropagation(); viewDocument(d.name, t.name) }}><SvgIcon id="ico-file" size={13} /><span>{d.name}</span></button>)}
+                      {taskAttachments.map(a => (
+                        <a key={a.id} className="task-attachment" href={a.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                          <SvgIcon id={a.type === 'application/pdf' ? 'ico-file' : 'ico-image'} size={13} />
+                          <span>{a.name}</span>
+                        </a>
+                      ))}
                     </div>
                   )}
                   {t.progress !== undefined && (

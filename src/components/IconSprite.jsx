@@ -35,6 +35,8 @@ export default function IconSprite() {
         <symbol id="ico-bookmark" viewBox="0 0 24 24"><path d="M5 3h14a1 1 0 011 1v16.5a.5.5 0 01-.75.43L12 17l-7.25 3.93A.5.5 0 014 20.5V4a1 1 0 011-1Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></symbol>
         <symbol id="ico-bookmark-fill" viewBox="0 0 24 24"><path d="M5 3h14a1 1 0 011 1v16.5a.5.5 0 01-.75.43L12 17l-7.25 3.93A.5.5 0 014 20.5V4a1 1 0 011-1Z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></symbol>
         <symbol id="ico-sort" viewBox="0 0 24 24"><path d="M3 6h18M3 12h12M3 18h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></symbol>
+        <symbol id="ico-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="m21 15-5-5L5 21" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></symbol>
+        <symbol id="ico-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></symbol>
       </defs>
     </svg>
   )

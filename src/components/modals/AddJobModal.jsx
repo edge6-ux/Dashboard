@@ -1,14 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { SvgIcon } from '../IconSprite'
 import { to24Hour, cronToHuman, estimateNextRun } from '../../lib/utils'
 import { loadLocalJobs, saveLocalJobs } from '../../lib/storage'
 import { SUPABASE_URL, sbHeaders } from '../../lib/supabase'
+import AttachmentUploader from '../AttachmentUploader'
 
 export default function AddJobModal({ ctx }) {
-  const { setAddModalOpen, toast, showPage, currentPage, agents, dbTasks, setDbTasks } = ctx
+  const { setAddModalOpen, toast, showPage, currentPage, agents, dbTasks, setDbTasks, user } = ctx
+
+  // Pre-generate task ID so attachments can be stored under a stable path
+  const taskIdRef = useRef('task-' + Date.now().toString(36))
 
   const [name, setName] = useState('')
-  const [agent, setAgent] = useState('christopher')
+  const [agent, setAgent] = useState('gordon')
+  const [attachments, setAttachments] = useState([])
   const [message, setMessage] = useState('')
   const [tz, setTz] = useState('America/New_York')
   const [delivery, setDelivery] = useState('announce')
@@ -70,19 +75,19 @@ export default function AddJobModal({ ctx }) {
 
       // Create task in Supabase
       const task = {
-        id: 'task-' + Date.now().toString(36),
+        id: taskIdRef.current,
         name: job.name, agent: job.agent, status: 'queued',
         type: isOneTime ? 'one-time' : 'recurring',
         description: job.message, createdAt: Date.now(), updatedAt: Date.now(),
         completedAt: null, color: job.color,
         schedule: job.cron ? cronToHuman(job.cron) : (isOneTime ? 'One-time task' : ''),
-        error: null, links: [], documents: [], progress: 0
+        error: null, links: [], documents: [], attachments, progress: 0
       }
       setDbTasks(prev => [task, ...prev])
       try {
         await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
           method: 'POST', headers: sbHeaders,
-          body: JSON.stringify({ id: task.id, name: task.name, agent: task.agent, status: task.status, type: task.type, description: task.description, created_at: task.createdAt, updated_at: task.updatedAt, completed_at: null, color: task.color, schedule: task.schedule, error: null, links: [], documents: [], progress: 0 })
+          body: JSON.stringify({ id: task.id, name: task.name, agent: task.agent, status: task.status, type: task.type, description: task.description, created_at: task.createdAt, updated_at: task.updatedAt, completed_at: null, color: task.color, schedule: task.schedule, error: null, links: [], documents: [], attachments, progress: 0 })
         })
       } catch (e) { console.warn('DB insert failed:', e) }
 
@@ -197,6 +202,19 @@ export default function AddJobModal({ ctx }) {
           <div className="form-group">
             <label className="form-label">Task Instructions <span className="required">*</span></label>
             <textarea className="form-textarea" value={message} onChange={e => setMessage(e.target.value)} placeholder="What should the agent do?" rows={4} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <SvgIcon id="ico-paperclip" size={13} /> Attachments
+              <span style={{ fontWeight: 400, color: 'var(--muted-fg)', fontSize: 11 }}>— PDFs or images for Gordon to analyze</span>
+            </label>
+            <AttachmentUploader
+              attachments={attachments}
+              onChange={setAttachments}
+              userId={user?.id}
+              taskId={taskIdRef.current}
+            />
           </div>
 
           <div className="form-group">

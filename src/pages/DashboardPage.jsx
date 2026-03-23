@@ -52,6 +52,9 @@ export default function DashboardPage({ ctx }) {
     return () => clearInterval(interval)
   }, [nextRunMs])
 
+  // Stable empty-state sparkline heights (avoids flicker from Math.random on re-render)
+  const EMPTY_SPARK = [6, 10, 8, 14, 7, 12, 9]
+
   // Agent ring
   const circumference = 113
   const pct = totalAgents > 0 ? onlineCount / totalAgents : 0
@@ -106,7 +109,7 @@ export default function DashboardPage({ ctx }) {
               {(sparkTasks.length === 0 ? Array(7).fill(null) : sparkTasks).map((t, i) => (
                 <div key={i} style={{
                   width: 4,
-                  height: t ? Math.max(4, (t.progress || 0) / 100 * 28) : 4 + Math.random() * 8,
+                  height: t ? Math.max(4, (t.progress || 0) / 100 * 28) : EMPTY_SPARK[i],
                   background: t ? (statuses[t.status] || 'var(--border)') : 'var(--border)',
                   borderRadius: 2, transition: 'height 0.3s'
                 }} />
