@@ -123,6 +123,27 @@ export default function DashboardApp() {
       if (tasks) setDbTasks(tasks)
     })
 
+    // Sync trackers from Supabase
+    if (user?.id) {
+      supabase.from('trackers').select('*').eq('user_id', user.id).then(({ data, error }) => {
+        if (error || !data) return
+        const local = loadTrackers()
+        const localIds = new Set(local.map(t => t.id))
+        let merged = [...local]
+        for (const row of data) {
+          if (!localIds.has(row.id)) {
+            merged.push({ id: row.id, name: row.name, keywords: row.keywords || [], color: row.color || '#b9a9ff', createdAt: row.created_at, updatedAt: row.updated_at, lastFetched: row.last_fetched })
+          } else {
+            const localT = merged.find(t => t.id === row.id)
+            if (localT && row.updated_at > (localT.updatedAt || 0)) {
+              Object.assign(localT, { name: row.name, keywords: row.keywords || localT.keywords, color: row.color || localT.color, updatedAt: row.updated_at, lastFetched: row.last_fetched || localT.lastFetched })
+            }
+          }
+        }
+        saveTrackers(merged)
+      })
+    }
+
     // Load output artifacts
     fetch('./output/artifacts.json', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)

@@ -50,10 +50,6 @@ export default function Sidebar({ currentPage, showPage }) {
         <SvgIcon id="ico-trash" size={21} />
         <span className="rail-tooltip">Trash</span>
       </button>
-      <button className="rail-btn" onClick={() => window.location.href = './'} aria-label="Chat">
-        <SvgIcon id="ico-chat" size={21} />
-        <span className="rail-tooltip">Chat</span>
-      </button>
     </nav>
   )
 }

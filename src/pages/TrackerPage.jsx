@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { SvgIcon } from '../components/IconSprite'
 import { getTimeAgo } from '../lib/utils'
 import { loadTrackers, saveTrackers, loadTrackerArticles, saveTrackerArticles, loadSavedArticles, saveSavedArticles } from '../lib/storage'
@@ -11,8 +11,45 @@ export default function TrackerPage({ ctx }) {
   const [keywordFilters, setKeywordFilters] = useState(new Set())
   const [sortNewest, setSortNewest] = useState(true)
   const [showingSaved, setShowingSaved] = useState(false)
+  const [synced, setSynced] = useState(false)
   const [, forceUpdate] = useState(0)
   const refresh = () => forceUpdate(n => n + 1)
+
+  // Sync trackers from Supabase on mount
+  useEffect(() => {
+    if (!user?.id || synced) return
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('trackers').select('*').eq('user_id', user.id)
+        if (error || !data) return
+        const local = loadTrackers()
+        const localIds = new Set(local.map(t => t.id))
+        let merged = [...local]
+        for (const row of data) {
+          if (!localIds.has(row.id)) {
+            merged.push({
+              id: row.id, name: row.name, keywords: row.keywords || [],
+              color: row.color || '#b9a9ff', createdAt: row.created_at,
+              updatedAt: row.updated_at, lastFetched: row.last_fetched
+            })
+          } else {
+            // Update local with server data if server is newer
+            const localT = merged.find(t => t.id === row.id)
+            if (localT && row.updated_at > (localT.updatedAt || 0)) {
+              localT.name = row.name
+              localT.keywords = row.keywords || localT.keywords
+              localT.color = row.color || localT.color
+              localT.updatedAt = row.updated_at
+              localT.lastFetched = row.last_fetched || localT.lastFetched
+            }
+          }
+        }
+        saveTrackers(merged)
+        setSynced(true)
+        refresh()
+      } catch (e) { console.warn('Tracker sync from Supabase failed:', e) }
+    })()
+  }, [user?.id, synced])
 
   const trackers = loadTrackers()
   const allArticles = loadTrackerArticles()
