@@ -9,7 +9,7 @@ export const AGENTS = {
 
 export const CRON_JOBS = [
   {
-    id: '109478ad',
+    id: '109478ad-16af-4243-94de-982fe73a6e08',
     name: 'Daily Briefing',
     agent: 'gordon',
     cron: '30 8 * * 1-5',
@@ -24,7 +24,7 @@ export const CRON_JOBS = [
     enabled: true
   },
   {
-    id: 'de5ffb87',
+    id: 'de5ffb87-dc68-4329-868b-1a7244205516',
     name: 'Daily Briefing (Discord)',
     agent: 'gordon',
     cron: '30 8 * * 1-5',

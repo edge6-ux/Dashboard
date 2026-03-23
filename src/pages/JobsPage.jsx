@@ -1,6 +1,7 @@
 import { SvgIcon } from '../components/IconSprite'
 import { cronToHuman } from '../lib/utils'
 import { loadLocalJobs, saveLocalJobs, getCancelledJobs, saveCancelledJobs, getTrash, saveTrash } from '../lib/storage'
+import { supabase } from '../lib/supabase'
 
 export default function JobsPage({ ctx }) {
   const { agents, getAllJobs, cronJobs, setCronJobs, setAddModalOpen, setDetailModalOpen, setDetailModalJob, toast, showPage } = ctx
@@ -24,18 +25,42 @@ export default function JobsPage({ ctx }) {
     showPage('jobs')
   }
 
-  const cancelJob = (id) => {
+  const cancelJob = async (id) => {
     const cancelled = getCancelledJobs()
     if (!cancelled.includes(id)) cancelled.push(id)
     saveCancelledJobs(cancelled)
     setCronJobs(prev => prev.map(j => j.id === id ? { ...j, enabled: false, status: 'disabled' } : j))
+
+    // Queue cron action for agent to execute
+    try {
+      await supabase.from('cron_actions').insert({
+        id: 'ca-' + Date.now().toString(36),
+        job_id: id,
+        action: 'disable',
+        status: 'pending',
+        created_at: Date.now()
+      })
+    } catch (e) { console.warn('Cron action queue failed:', e) }
+
     toast('Job cancelled', 'success')
   }
 
-  const reenableJob = (id) => {
+  const reenableJob = async (id) => {
     const cancelled = getCancelledJobs().filter(cid => cid !== id)
     saveCancelledJobs(cancelled)
     setCronJobs(prev => prev.map(j => j.id === id ? { ...j, enabled: true, status: 'active', _deleted: false } : j))
+
+    // Queue cron action for agent to execute
+    try {
+      await supabase.from('cron_actions').insert({
+        id: 'ca-' + Date.now().toString(36),
+        job_id: id,
+        action: 'enable',
+        status: 'pending',
+        created_at: Date.now()
+      })
+    } catch (e) { console.warn('Cron action queue failed:', e) }
+
     toast('Job re-enabled', 'success')
   }
 
