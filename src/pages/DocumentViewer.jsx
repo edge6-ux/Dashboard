@@ -7,13 +7,15 @@ export default function DocumentViewer({ ctx }) {
   const [loading, setLoading] = useState(true)
 
   const filename = docPage?.filename
+  const url = docPage?.url
   const title = docPage?.title || filename
   const returnPage = docPage?.returnPage || 'tasks'
 
   useEffect(() => {
-    if (!filename) return
+    const src = url || (filename ? `./output/${filename}` : null)
+    if (!src) return
     setLoading(true)
-    fetch(`./output/${filename}`)
+    fetch(src)
       .then(r => { if (!r.ok) throw new Error('Not found'); return r.text() })
       .then(html => {
         const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
@@ -24,7 +26,7 @@ export default function DocumentViewer({ ctx }) {
         setContent(null)
         setLoading(false)
       })
-  }, [filename])
+  }, [filename, url])
 
   const copyContent = () => {
     const el = document.getElementById('docPageBody')
@@ -45,8 +47,8 @@ export default function DocumentViewer({ ctx }) {
 
   const downloadDoc = () => {
     const a = document.createElement('a')
-    a.href = `./output/${filename}`
-    a.download = filename
+    a.href = url || `./output/${filename}`
+    a.download = filename || 'response.html'
     a.click()
   }
 
@@ -75,7 +77,7 @@ export default function DocumentViewer({ ctx }) {
               <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.5 }}>📄</div>
               <div style={{ color: 'var(--muted-fg)', fontSize: 14 }}>Could not load document</div>
               <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>{filename}</div>
-              <a href={`./output/${filename}`} download className="btn btn-sm" style={{ marginTop: 16, display: 'inline-flex', textDecoration: 'none' }}>⬇ Download Instead</a>
+              <a href={url || `./output/${filename}`} download className="btn btn-sm" style={{ marginTop: 16, display: 'inline-flex', textDecoration: 'none' }}>⬇ Download Instead</a>
             </div>
           )}
         </div>

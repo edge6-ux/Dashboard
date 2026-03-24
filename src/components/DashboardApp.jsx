@@ -249,10 +249,12 @@ export default function DashboardApp() {
         try {
           const { text } = await runGordon({ message: job.message, attachments })
 
-          // Upload output as text file to Supabase Storage
-          const outputPath = `outputs/${job.task_id}.txt`
-          const blob = new Blob([text], { type: 'text/plain' })
-          await supabase.storage.from('task-attachments').upload(outputPath, blob, { upsert: true, contentType: 'text/plain' })
+          // Upload output as HTML to Supabase Storage
+          const outputPath = `outputs/${job.task_id}.html`
+          const escapedText = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${job.name}</title></head><body><pre style="white-space:pre-wrap;font-family:inherit;line-height:1.8;font-size:0.95rem">${escapedText}</pre></body></html>`
+          const blob = new Blob([html], { type: 'text/html' })
+          await supabase.storage.from('task-attachments').upload(outputPath, blob, { upsert: true, contentType: 'text/html' })
           const { data: urlData } = supabase.storage.from('task-attachments').getPublicUrl(outputPath)
           const links = urlData?.publicUrl ? [{ url: urlData.publicUrl, label: 'View Response' }] : []
 
@@ -512,8 +514,8 @@ export default function DashboardApp() {
   }, [])
 
   // View document
-  const viewDocument = useCallback((filename, title) => {
-    setDocPage({ filename, title, returnPage: currentPage })
+  const viewDocument = useCallback((filename, title, url = null) => {
+    setDocPage({ filename, title, returnPage: currentPage, url })
     setCurrentPage('document')
   }, [currentPage])
 

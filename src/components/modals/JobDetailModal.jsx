@@ -2,8 +2,8 @@ import { SvgIcon } from '../IconSprite'
 import { cronToHuman } from '../../lib/utils'
 
 export default function JobDetailModal({ ctx }) {
-  const { agents, getAllJobs, detailModalJob, detailModalTask, setDetailModalOpen, toast } = ctx
-  
+  const { agents, getAllJobs, detailModalJob, detailModalTask, setDetailModalOpen, toast, viewDocument, showPage } = ctx
+
   const close = () => { ctx.setDetailModalOpen(false); ctx.setDetailModalJob(null); ctx.setDetailModalTask(null) }
 
   // If showing task detail
@@ -13,6 +13,12 @@ export default function JobDetailModal({ ctx }) {
     const statusLabels = { queued: 'Queued', running: 'In Progress', completed: 'Completed', error: 'Stuck / Error' }
     const completedStr = task.completedAt ? new Date(task.completedAt).toLocaleString('en-US', { timeZone: 'America/New_York' }) : '—'
     const createdStr = task.createdAt ? new Date(task.createdAt).toLocaleString('en-US', { timeZone: 'America/New_York' }) : '—'
+    const responseLink = (task.links || []).find(l => l.label === 'View Response')
+
+    const openResponse = () => {
+      close()
+      viewDocument(null, task.name, responseLink.url)
+    }
 
     return (
       <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) close() }}>
@@ -27,8 +33,14 @@ export default function JobDetailModal({ ctx }) {
             <div className="detail-row"><div className="detail-key">Created</div><div className="detail-val">{createdStr}</div></div>
             <div className="detail-row"><div className="detail-key">Completed</div><div className="detail-val" style={task.completedAt ? { color: 'var(--ok)', fontWeight: 600 } : {}}>{completedStr}</div></div>
             {task.description && <div className="detail-row"><div className="detail-key">Instructions</div><div className="detail-val" style={{ fontSize: 12, lineHeight: 1.6 }}>{task.description}</div></div>}
+            {task.error && <div className="detail-row"><div className="detail-key">Error</div><div className="detail-val" style={{ color: 'var(--danger)', fontSize: 12 }}>{task.error}</div></div>}
           </div>
           <div className="modal-footer">
+            {responseLink && (
+              <button className="btn btn-primary" onClick={openResponse}>
+                <SvgIcon id="ico-file" size={15} /> View Response
+              </button>
+            )}
             <button className="btn" onClick={close}>Close</button>
           </div>
         </div>
