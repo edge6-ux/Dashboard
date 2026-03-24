@@ -100,7 +100,7 @@ export default function DashboardApp() {
           description: r.description, createdAt: r.created_at, updatedAt: r.updated_at,
           completedAt: r.completed_at, color: r.color, schedule: r.schedule, error: r.error,
           links: r.links || [], documents: r.documents || [], attachments: r.attachments || [],
-          progress: r.progress, bookmarked: r.bookmarked || false, fromDB: true
+          progress: r.progress, bookmarked: r.bookmarked || false, output: r.output || null, fromDB: true
         }))
       }
     } catch (e) { console.warn('Supabase fetch failed:', e) }
@@ -249,23 +249,18 @@ export default function DashboardApp() {
         try {
           const { text } = await runGordon({ message: job.message, attachments })
 
-          // Upload output as HTML to Supabase Storage
-          const outputPath = `outputs/${job.task_id}.html`
+          // Store output directly on the task record
           const escapedText = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-          const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${job.name}</title></head><body><pre style="white-space:pre-wrap;font-family:inherit;line-height:1.8;font-size:0.95rem">${escapedText}</pre></body></html>`
-          const blob = new Blob([html], { type: 'text/html' })
-          await supabase.storage.from('task-attachments').upload(outputPath, blob, { upsert: true, contentType: 'text/html' })
-          const { data: urlData } = supabase.storage.from('task-attachments').getPublicUrl(outputPath)
-          const links = urlData?.publicUrl ? [{ url: urlData.publicUrl, label: 'View Response' }] : []
+          const output = `<pre style="white-space:pre-wrap;font-family:inherit;line-height:1.8;font-size:0.95rem">${escapedText}</pre>`
 
           // Mark task completed
           await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${job.task_id}`, {
             method: 'PATCH',
             headers: { ...sbHeaders, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ status: 'completed', updated_at: Date.now(), completed_at: Date.now(), links, progress: 100 })
+            body: JSON.stringify({ status: 'completed', updated_at: Date.now(), completed_at: Date.now(), output, progress: 100 })
           })
           setDbTasks(prev => prev.map(t =>
-            t.id === job.task_id ? { ...t, status: 'completed', updatedAt: Date.now(), completedAt: Date.now(), links, progress: 100 } : t
+            t.id === job.task_id ? { ...t, status: 'completed', updatedAt: Date.now(), completedAt: Date.now(), output, progress: 100 } : t
           ))
         } catch (e) {
           await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${job.task_id}`, {
@@ -514,8 +509,8 @@ export default function DashboardApp() {
   }, [])
 
   // View document
-  const viewDocument = useCallback((filename, title, url = null) => {
-    setDocPage({ filename, title, returnPage: currentPage, url })
+  const viewDocument = useCallback((filename, title, content = null) => {
+    setDocPage({ filename, title, returnPage: currentPage, content })
     setCurrentPage('document')
   }, [currentPage])
 

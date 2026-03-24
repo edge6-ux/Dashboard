@@ -2,7 +2,7 @@ import { SvgIcon } from '../IconSprite'
 import { cronToHuman } from '../../lib/utils'
 
 export default function JobDetailModal({ ctx }) {
-  const { agents, getAllJobs, detailModalJob, detailModalTask, setDetailModalOpen, toast, viewDocument, showPage } = ctx
+  const { agents, getAllJobs, detailModalJob, detailModalTask, setDetailModalOpen, toast, viewDocument } = ctx
 
   const close = () => { ctx.setDetailModalOpen(false); ctx.setDetailModalJob(null); ctx.setDetailModalTask(null) }
 
@@ -13,11 +13,11 @@ export default function JobDetailModal({ ctx }) {
     const statusLabels = { queued: 'Queued', running: 'In Progress', completed: 'Completed', error: 'Stuck / Error' }
     const completedStr = task.completedAt ? new Date(task.completedAt).toLocaleString('en-US', { timeZone: 'America/New_York' }) : '—'
     const createdStr = task.createdAt ? new Date(task.createdAt).toLocaleString('en-US', { timeZone: 'America/New_York' }) : '—'
-    const responseLink = (task.links || []).find(l => l.label === 'View Response')
+    const hasResponse = !!task.output
 
     const openResponse = () => {
       close()
-      viewDocument(null, task.name, responseLink.url)
+      viewDocument(null, task.name, task.output)
     }
 
     return (
@@ -36,7 +36,7 @@ export default function JobDetailModal({ ctx }) {
             {task.error && <div className="detail-row"><div className="detail-key">Error</div><div className="detail-val" style={{ color: 'var(--danger)', fontSize: 12 }}>{task.error}</div></div>}
           </div>
           <div className="modal-footer">
-            {responseLink && (
+            {hasResponse && (
               <button className="btn btn-primary" onClick={openResponse}>
                 <SvgIcon id="ico-file" size={15} /> View Response
               </button>

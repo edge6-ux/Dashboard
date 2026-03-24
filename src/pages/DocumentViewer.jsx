@@ -7,15 +7,20 @@ export default function DocumentViewer({ ctx }) {
   const [loading, setLoading] = useState(true)
 
   const filename = docPage?.filename
-  const url = docPage?.url
+  const inlineContent = docPage?.content
   const title = docPage?.title || filename
   const returnPage = docPage?.returnPage || 'tasks'
 
   useEffect(() => {
-    const src = url || (filename ? `./output/${filename}` : null)
-    if (!src) return
+    // If content was passed directly (e.g. Gordon response), show it without fetching
+    if (inlineContent) {
+      setContent(inlineContent)
+      setLoading(false)
+      return
+    }
+    if (!filename) return
     setLoading(true)
-    fetch(src)
+    fetch(`./output/${filename}`)
       .then(r => { if (!r.ok) throw new Error('Not found'); return r.text() })
       .then(html => {
         const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
@@ -26,7 +31,7 @@ export default function DocumentViewer({ ctx }) {
         setContent(null)
         setLoading(false)
       })
-  }, [filename, url])
+  }, [filename, inlineContent])
 
   const copyContent = () => {
     const el = document.getElementById('docPageBody')
@@ -46,9 +51,18 @@ export default function DocumentViewer({ ctx }) {
   }
 
   const downloadDoc = () => {
+    if (inlineContent) {
+      const blob = new Blob([`<!DOCTYPE html><html><body>${inlineContent}</body></html>`], { type: 'text/html' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = (title || 'response').replace(/[^a-z0-9]/gi, '_') + '.html'
+      a.click()
+      URL.revokeObjectURL(a.href)
+      return
+    }
     const a = document.createElement('a')
-    a.href = url || `./output/${filename}`
-    a.download = filename || 'response.html'
+    a.href = `./output/${filename}`
+    a.download = filename
     a.click()
   }
 
@@ -77,7 +91,7 @@ export default function DocumentViewer({ ctx }) {
               <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.5 }}>📄</div>
               <div style={{ color: 'var(--muted-fg)', fontSize: 14 }}>Could not load document</div>
               <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>{filename}</div>
-              <a href={url || `./output/${filename}`} download className="btn btn-sm" style={{ marginTop: 16, display: 'inline-flex', textDecoration: 'none' }}>⬇ Download Instead</a>
+              <a href={`./output/${filename}`} download className="btn btn-sm" style={{ marginTop: 16, display: 'inline-flex', textDecoration: 'none' }}>⬇ Download Instead</a>
             </div>
           )}
         </div>
