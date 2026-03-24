@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { SvgIcon } from './IconSprite'
 import { AGENTS as AGENTS_CONST, CRON_JOBS as CRON_JOBS_CONST, GATEWAY_URL, HUES, BUILTIN_OUTPUT_ARTIFACTS } from '../lib/constants'
 import { supabase, SUPABASE_URL, SUPABASE_KEY, sbHeaders } from '../lib/supabase'
-import { gordonAvailable } from '../lib/gordon'
+import { gordonAvailable, runGordon } from '../lib/gordon'
 import { loadHue, saveHue, loadLocalJobs, saveLocalJobs, loadTrackers, saveTrackers, loadTrackerArticles, saveTrackerArticles, loadSavedArticles, saveSavedArticles, loadNotifications, saveNotifications, getCancelledJobs, saveCancelledJobs, getDismissedCronJobIds, saveDismissedCronJobIds, getTrash, saveTrash, getDispatchedCatchups, saveDispatchedCatchups } from '../lib/storage'
 import { escapeHtml, getTimeAgo, truncate, fmtDate, isToday, isTomorrow, cronToHuman, cronMatchesDate, cronHour, cronMinute, estimateNextRun, getJobDatesForMonth, to24Hour, animateCounter, getLastScheduledBefore, fmtRunDate } from '../lib/utils'
 
@@ -198,6 +198,97 @@ export default function DashboardApp() {
     const interval = setInterval(check, 15000)
     return () => clearInterval(interval)
   }, [addNotification])
+
+  // Gordon browser executor — polls job_queue and runs Gordon tasks directly via OpenAI
+  useEffect(() => {
+    if (!gordonAvailable()) return
+    let busy = false
+
+    const poll = async () => {
+      if (busy) return
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/job_queue?agent=eq.gordon&status=eq.pending&order=created_at.asc&limit=1`,
+          { headers: sbHeaders }
+        )
+        if (!res.ok) return
+        const jobs = await res.json()
+        if (!jobs.length) return
+
+        busy = true
+        const job = jobs[0]
+
+        // Claim the job
+        await fetch(`${SUPABASE_URL}/rest/v1/job_queue?id=eq.${job.id}`, {
+          method: 'PATCH',
+          headers: { ...sbHeaders, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ status: 'running' })
+        })
+
+        // Mark task as running
+        await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${job.task_id}`, {
+          method: 'PATCH',
+          headers: { ...sbHeaders, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ status: 'running', updated_at: Date.now() })
+        })
+        setDbTasks(prev => prev.map(t =>
+          t.id === job.task_id ? { ...t, status: 'running', updatedAt: Date.now() } : t
+        ))
+
+        // Fetch task attachments
+        const taskRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/tasks?id=eq.${job.task_id}&select=attachments`,
+          { headers: sbHeaders }
+        )
+        const taskRows = taskRes.ok ? await taskRes.json() : []
+        const attachments = taskRows[0]?.attachments || []
+
+        try {
+          const { text } = await runGordon({ message: job.message, attachments })
+
+          // Upload output as text file to Supabase Storage
+          const outputPath = `outputs/${job.task_id}.txt`
+          const blob = new Blob([text], { type: 'text/plain' })
+          await supabase.storage.from('task-attachments').upload(outputPath, blob, { upsert: true, contentType: 'text/plain' })
+          const { data: urlData } = supabase.storage.from('task-attachments').getPublicUrl(outputPath)
+          const links = urlData?.publicUrl ? [{ url: urlData.publicUrl, label: 'View Response' }] : []
+
+          // Mark task completed
+          await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${job.task_id}`, {
+            method: 'PATCH',
+            headers: { ...sbHeaders, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ status: 'completed', updated_at: Date.now(), completed_at: Date.now(), links, progress: 100 })
+          })
+          setDbTasks(prev => prev.map(t =>
+            t.id === job.task_id ? { ...t, status: 'completed', updatedAt: Date.now(), completedAt: Date.now(), links, progress: 100 } : t
+          ))
+        } catch (e) {
+          await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${job.task_id}`, {
+            method: 'PATCH',
+            headers: { ...sbHeaders, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ status: 'error', error: e.message, updated_at: Date.now() })
+          })
+          setDbTasks(prev => prev.map(t =>
+            t.id === job.task_id ? { ...t, status: 'error', error: e.message, updatedAt: Date.now() } : t
+          ))
+          console.warn('Gordon task error:', e)
+        }
+
+        // Remove from job_queue
+        await fetch(`${SUPABASE_URL}/rest/v1/job_queue?id=eq.${job.id}`, {
+          method: 'DELETE',
+          headers: sbHeaders
+        })
+      } catch (e) {
+        console.warn('Gordon executor error:', e)
+      } finally {
+        busy = false
+      }
+    }
+
+    const interval = setInterval(poll, 5000)
+    return () => clearInterval(interval)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Catchup: when gateway comes online, dispatch any recurring jobs missed within the last 3 hours
   useEffect(() => {
