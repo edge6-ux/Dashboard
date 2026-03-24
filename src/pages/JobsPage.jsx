@@ -16,7 +16,7 @@ export default function JobsPage({ ctx }) {
       type: 'recurring', description: job.message,
       createdAt: Date.now(), updatedAt: Date.now(), completedAt: null,
       color: job.color, schedule: 'Manual run',
-      error: null, links: [], documents: [], attachments: [], progress: 0
+      error: null, links: [], documents: [], attachments: job.attachments || [], progress: 0
     }
     setDbTasks(prev => [task, ...prev])
     await dbInsertTask(task)

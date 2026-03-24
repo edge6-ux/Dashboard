@@ -1,12 +1,11 @@
 import { useState, useRef } from 'react'
 import { SvgIcon } from '../IconSprite'
-import { to24Hour, cronToHuman, estimateNextRun } from '../../lib/utils'
+import { to24Hour, estimateNextRun } from '../../lib/utils'
 import { loadLocalJobs, saveLocalJobs } from '../../lib/storage'
-import { SUPABASE_URL, sbHeaders } from '../../lib/supabase'
 import AttachmentUploader from '../AttachmentUploader'
 
 export default function AddJobModal({ ctx }) {
-  const { setAddModalOpen, toast, showPage, currentPage, agents, dbTasks, setDbTasks, user } = ctx
+  const { setAddModalOpen, toast, showPage, currentPage, agents, user } = ctx
 
   // Pre-generate task ID so attachments can be stored under a stable path
   const taskIdRef = useRef('task-' + Date.now().toString(36))
@@ -66,30 +65,13 @@ export default function AddJobModal({ ctx }) {
         status: isOneTime ? 'draft' : 'active', enabled: true, isLocal: true, isOneTime,
         scheduleType: isOneTime ? 'draft' : 'cron',
         nextRun: cron ? estimateNextRun(cron, tz) : null,
-        lastRun: null, lastError: null
+        lastRun: null, lastError: null,
+        attachments
       }
 
       const locals = loadLocalJobs()
       locals.push(job)
       saveLocalJobs(locals)
-
-      // Create task in Supabase
-      const task = {
-        id: taskIdRef.current,
-        name: job.name, agent: job.agent, status: 'queued',
-        type: isOneTime ? 'one-time' : 'recurring',
-        description: job.message, createdAt: Date.now(), updatedAt: Date.now(),
-        completedAt: null, color: job.color,
-        schedule: job.cron ? cronToHuman(job.cron) : (isOneTime ? 'One-time task' : ''),
-        error: null, links: [], documents: [], attachments, progress: 0
-      }
-      setDbTasks(prev => [task, ...prev])
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
-          method: 'POST', headers: sbHeaders,
-          body: JSON.stringify({ id: task.id, name: task.name, agent: task.agent, status: task.status, type: task.type, description: task.description, created_at: task.createdAt, updated_at: task.updatedAt, completed_at: null, color: task.color, schedule: task.schedule, error: null, links: [], documents: [], attachments, progress: 0 })
-        })
-      } catch (e) { console.warn('DB insert failed:', e) }
 
       setAddModalOpen(false)
       toast(isOneTime ? `"${name}" saved as draft.` : `Job "${name}" created.`, 'success')

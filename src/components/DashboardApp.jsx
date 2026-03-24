@@ -29,7 +29,10 @@ export default function DashboardApp() {
   const [currentPage, setCurrentPage] = useState('dashboard')
   const [hue, setHue] = useState(loadHue())
   const [gatewayOnline, setGatewayOnline] = useState(null)
-  const [agents, setAgents] = useState({ ...AGENTS_CONST })
+  const [agents, setAgents] = useState(() => ({
+    ...AGENTS_CONST,
+    gordon: { ...AGENTS_CONST.gordon, status: gordonAvailable() ? 'online' : 'offline' }
+  }))
   const [cronJobs, setCronJobs] = useState(() => CRON_JOBS_CONST.map(j => ({ ...j })))
   const [dbTasks, setDbTasks] = useState([])
   const [notifications, setNotifications] = useState(loadNotifications())
