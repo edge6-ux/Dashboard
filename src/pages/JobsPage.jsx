@@ -8,6 +8,13 @@ export default function JobsPage({ ctx }) {
   const jobs = getAllJobs()
 
   const runJobNow = async (job) => {
+    const alreadyActive = dbTasks.some(t =>
+      t.agent === job.agent &&
+      (t.name === job.name || t.name.startsWith(job.name + ' ')) &&
+      (t.status === 'queued' || t.status === 'running')
+    )
+    if (alreadyActive) { toast(`"${job.name}" is already running`, 'warn'); return }
+
     const taskId = 'run-' + Date.now().toString(36)
     const dateStr = fmtRunDate(Date.now())
     const name = `${job.name} ${dateStr}`
